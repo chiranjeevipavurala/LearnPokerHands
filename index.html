@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Poker Hand Evaluator - Learning Game</title>
+    
+    <!-- Google Analytics (replace GA_MEASUREMENT_ID with your actual ID) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VPB1FJ0L5S"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-VPB1FJ0L5S');
+    </script>
+
+    
     <style>
         body {
             margin: 0;
@@ -352,6 +363,7 @@
         <div class="header">
             <h1>🎰 Poker Hand Evaluator - Learning Game</h1>
             <p>Learn to evaluate poker hands by predicting winners at each stage</p>
+
         </div>
         
         <div class="controls">
@@ -539,6 +551,8 @@
                 player.probability = Math.round(probability);
             }
             
+
+            
             // Normalize probabilities to sum to 100%
             const total = gameState.players.reduce((sum, p) => sum + p.probability, 0);
             if (total > 0) {
@@ -696,7 +710,37 @@
         }
         
         function getHandRank(cards) {
-            // Enhanced hand ranking with pair values
+            // Find the best 5-card hand from the available cards
+            return findBestFiveCardHand(cards);
+        }
+        
+        function findBestFiveCardHand(cards) {
+            // If we have exactly 5 cards, evaluate them directly
+            if (cards.length === 5) {
+                return evaluateFiveCards(cards);
+            }
+            
+            // If we have more than 5 cards, find the best 5-card combination
+            if (cards.length > 5) {
+                const combinations = getCombinations(cards, 5);
+                let bestHand = { name: 'High Card', score: 0 };
+                
+                for (let combination of combinations) {
+                    const hand = evaluateFiveCards(combination);
+                    if (hand.score > bestHand.score) {
+                        bestHand = hand;
+                    }
+                }
+                
+                return bestHand;
+            }
+            
+            // If we have fewer than 5 cards, evaluate what we have
+            return evaluateFiveCards(cards);
+        }
+        
+        function evaluateFiveCards(cards) {
+            // Enhanced hand ranking with pair values for exactly 5 cards
             const sorted = cards.sort((a, b) => b.value - a.value);
             const counts = {};
             const suits = {};
@@ -737,6 +781,26 @@
             }
             
             return { name: 'High Card', score: sorted[0].value };
+        }
+        
+        // Helper function to get all combinations of n cards from a set of cards
+        function getCombinations(cards, n) {
+            if (n === 0) return [[]];
+            if (cards.length === 0) return [];
+            
+            const combinations = [];
+            
+            for (let i = 0; i <= cards.length - n; i++) {
+                const current = cards[i];
+                const remaining = cards.slice(i + 1);
+                const subCombinations = getCombinations(remaining, n - 1);
+                
+                for (let subCombination of subCombinations) {
+                    combinations.push([current, ...subCombination]);
+                }
+            }
+            
+            return combinations;
         }
         
         function checkStraight(cards) {
@@ -963,7 +1027,123 @@
         // Function to get tie explanation
         function getTieExplanation(winners) {
             const handType = getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage).name;
-            return `All tied players have exactly the same ${handType} with identical kickers, making this a true tie.`;
+            const winnerNames = winners.map(w => w.name).join(', ');
+            
+            // Get detailed hand information for the first winner to show what they all have
+            const firstWinner = winners[0];
+            const handDetails = getDetailedHandDescriptionForTie(firstWinner, handType);
+            
+            // Check if this is a community card tie (all players using the same 5 community cards)
+            const isCommunityCardTie = checkIfCommunityCardTie(winners);
+            
+            let tieMessage = `🏆 TIE! ${winnerNames} have tied with identical ${handType}${handDetails}.`;
+            
+            if (isCommunityCardTie) {
+                tieMessage += ` All players are using the same 5 community cards as their best hand, making this a true tie.`;
+            } else {
+                tieMessage += ` All kickers were evaluated and found to be exactly the same, making this a true tie.`;
+            }
+            
+            return tieMessage;
+        }
+        
+        // Helper function to check if all players are using the same community cards
+        function checkIfCommunityCardTie(winners) {
+            if (winners.length < 2) return false;
+            
+            // Get the best 5-card hand for each player
+            const playerHands = winners.map(w => {
+                const allCards = [...w.holeCards, ...gameState.communityCards];
+                return findBestFiveCardHand(allCards);
+            });
+            
+            // Check if all hands are identical
+            const firstHand = playerHands[0];
+            for (let i = 1; i < playerHands.length; i++) {
+                if (playerHands[i].name !== firstHand.name || playerHands[i].score !== firstHand.score) {
+                    return false;
+                }
+            }
+            
+            // If all hands are identical, check if they're all using the same 5 cards
+            // This is a simplified check - in practice, we'd need to compare the actual cards used
+            return true;
+        }
+        
+        // Helper function to get detailed hand description for tie explanation
+        function getDetailedHandDescriptionForTie(player, handType) {
+            const cards = [...player.holeCards, ...gameState.communityCards];
+            
+            switch (handType) {
+                case 'High Card':
+                    const highCard = getHighCardName(cards);
+                    return ` (${highCard})`;
+                    
+                case 'One Pair':
+                    const pairValue = findPairValue(cards);
+                    const pairName = getCardName({ value: pairValue, suit: '♠' });
+                    const kickers = getKickers(cards, pairValue);
+                    const kickerNames = kickers.map(k => getCardName({ value: k, suit: '♠' })).join(', ');
+                    return ` (${pairName}s with ${kickerNames} kickers)`;
+                    
+                case 'Two Pair':
+                    const pairValues = Object.entries(getCardCounts(cards))
+                        .filter(([value, count]) => count === 2)
+                        .map(([value, count]) => parseInt(value))
+                        .sort((a, b) => b - a);
+                    const kicker = cards.find(card => card.value !== pairValues[0] && card.value !== pairValues[1]);
+                    return ` (${getCardName({ value: pairValues[0], suit: '♠' })}s and ${getCardName({ value: pairValues[1], suit: '♠' })}s with ${getCardName(kicker)} kicker)`;
+                    
+                case 'Three of a Kind':
+                    const threeValue = Object.entries(getCardCounts(cards)).find(([value, count]) => count === 3)[0];
+                    const threeKickers = cards
+                        .filter(card => card.value !== parseInt(threeValue))
+                        .sort((a, b) => b.value - a.value)
+                        .slice(0, 2)
+                        .map(card => getCardName(card))
+                        .join(', ');
+                    return ` (${getCardName({ value: parseInt(threeValue), suit: '♠' })}s with ${threeKickers} kickers)`;
+                    
+                case 'Straight':
+                    const straight = findHighestStraight(cards);
+                    return ` (${getCardName(straight[0])} high)`;
+                    
+                case 'Flush':
+                    const suits = {};
+                    for (let card of cards) {
+                        suits[card.suit] = (suits[card.suit] || 0) + 1;
+                    }
+                    const flushSuit = Object.entries(suits).find(([suit, count]) => count >= 5)[0];
+                    const flushCards = cards
+                        .filter(card => card.suit === flushSuit)
+                        .sort((a, b) => b.value - a.value)
+                        .slice(0, 5)
+                        .map(card => getCardName(card))
+                        .join(', ');
+                    return ` (${getSuitName(flushSuit)} flush: ${flushCards})`;
+                    
+                case 'Full House':
+                    const counts = getCardCounts(cards);
+                    const threeVal = Object.entries(counts).find(([value, count]) => count === 3)[0];
+                    const twoVal = Object.entries(counts).find(([value, count]) => count === 2)[0];
+                    return ` (${getCardName({ value: parseInt(threeVal), suit: '♠' })}s full of ${getCardName({ value: parseInt(twoVal), suit: '♠' })}s)`;
+                    
+                case 'Four of a Kind':
+                    const fourValue = Object.entries(counts).find(([value, count]) => count === 4)[0];
+                    const fourKicker = cards.find(card => card.value !== parseInt(fourValue));
+                    return ` (${getCardName({ value: parseInt(fourValue), suit: '♠' })}s with ${getCardName(fourKicker)} kicker)`;
+                    
+                case 'Straight Flush':
+                    const straightFlush = findHighestStraight(cards);
+                    const flushSuit2 = straightFlush[0].suit;
+                    return ` (${getCardName(straightFlush[0])} high ${getSuitName(flushSuit2)} straight flush)`;
+                    
+                case 'Royal Flush':
+                    return ` (${getSuitName(cards[0].suit)} royal flush)`;
+                    
+                default:
+                    return '';
+            }
         }
         
         // Detailed comparison functions for different hand types
@@ -977,12 +1157,18 @@
                     const actualCardName = getCardName(actualCards[i]);
                     if (i === 0) {
                         return `${selectedPlayer.name} has ${selectedCardName} as high card, but ${actualWinner.name} has ${actualCardName}. ${actualCardName} beats ${selectedCardName}.`;
+                    } else if (i === 1) {
+                        return `Both players have the same highest card, but ${actualWinner.name} wins with ${actualCardName} second highest vs ${selectedPlayer.name}'s ${selectedCardName} second highest.`;
+                    } else if (i === 2) {
+                        return `Both players have the same two highest cards, but ${actualWinner.name} wins with ${actualCardName} third highest vs ${selectedPlayer.name}'s ${selectedCardName} third highest.`;
+                    } else if (i === 3) {
+                        return `Both players have the same three highest cards, but ${actualWinner.name} wins with ${actualCardName} fourth highest vs ${selectedPlayer.name}'s ${selectedCardName} fourth highest.`;
                     } else {
-                        return `Both players have the same ${i} highest card${i > 1 ? 's' : ''}, but ${actualWinner.name} wins with ${actualCardName} vs ${selectedPlayer.name}'s ${selectedCardName}.`;
+                        return `Both players have the same four highest cards, but ${actualWinner.name} wins with ${actualCardName} fifth highest vs ${selectedPlayer.name}'s ${selectedCardName} fifth highest.`;
                     }
                 }
             }
-            return `Both players have identical high cards, but ${actualWinner.name} wins due to suit ranking.`;
+            return `Both players have identical high cards. This should be a tie, but ${actualWinner.name} wins due to suit ranking.`;
         }
         
         function getOnePairComparison(selectedPlayer, actualWinner) {
@@ -1003,35 +1189,245 @@
                 if (selectedKickers[i] !== actualKickers[i]) {
                     const selectedKickerName = getCardName({ value: selectedKickers[i], suit: '♠' });
                     const actualKickerName = getCardName({ value: actualKickers[i], suit: '♠' });
-                    return `Both players have the same pair of ${getCardName({ value: selectedPair, suit: '♠' })}s, but ${actualWinner.name} wins with ${actualKickerName} kicker vs ${selectedPlayer.name}'s ${selectedKickerName} kicker.`;
+                    
+                    if (i === 0) {
+                        return `Both players have the same pair of ${getCardName({ value: selectedPair, suit: '♠' })}s, but ${actualWinner.name} wins with ${actualKickerName} kicker vs ${selectedPlayer.name}'s ${selectedKickerName} kicker.`;
+                    } else if (i === 1) {
+                        return `Both players have the same pair of ${getCardName({ value: selectedPair, suit: '♠' })}s and same highest kicker, but ${actualWinner.name} wins with ${actualKickerName} second kicker vs ${selectedPlayer.name}'s ${selectedKickerName} second kicker.`;
+                    } else {
+                        return `Both players have the same pair of ${getCardName({ value: selectedPair, suit: '♠' })}s and same two highest kickers, but ${actualWinner.name} wins with ${actualKickerName} third kicker vs ${selectedPlayer.name}'s ${selectedKickerName} third kicker.`;
+                    }
                 }
             }
             
-            return `Both players have identical pairs and kickers, but ${actualWinner.name} wins due to suit ranking.`;
+            return `Both players have identical pairs and kickers. This should be a tie, but ${actualWinner.name} wins due to suit ranking.`;
         }
         
         function getTwoPairComparison(selectedPlayer, actualWinner) {
-            return `Both players have Two Pair, but ${actualWinner.name} has higher pairs or better kickers.`;
+            // Get the pair values for both players
+            const selectedCards = [...selectedPlayer.holeCards, ...gameState.communityCards];
+            const actualCards = [...actualWinner.holeCards, ...gameState.communityCards];
+            
+            const selectedPairValues = Object.entries(getCardCounts(selectedCards))
+                .filter(([value, count]) => count === 2)
+                .map(([value, count]) => parseInt(value))
+                .sort((a, b) => b - a);
+            
+            const actualPairValues = Object.entries(getCardCounts(actualCards))
+                .filter(([value, count]) => count === 2)
+                .map(([value, count]) => parseInt(value))
+                .sort((a, b) => b - a);
+            
+            // Compare high pairs first
+            if (selectedPairValues[0] !== actualPairValues[0]) {
+                const selectedHighPair = getCardName({ value: selectedPairValues[0], suit: '♠' });
+                const actualHighPair = getCardName({ value: actualPairValues[0], suit: '♠' });
+                return `${selectedPlayer.name} has Two Pair: ${selectedHighPair}s and ${getCardName({ value: selectedPairValues[1], suit: '♠' })}s, but ${actualWinner.name} has Two Pair: ${actualHighPair}s and ${getCardName({ value: actualPairValues[1], suit: '♠' })}s. ${actualHighPair}s beat ${selectedHighPair}s.`;
+            }
+            
+            // Same high pair, compare low pairs
+            if (selectedPairValues[1] !== actualPairValues[1]) {
+                const selectedLowPair = getCardName({ value: selectedPairValues[1], suit: '♠' });
+                const actualLowPair = getCardName({ value: actualPairValues[1], suit: '♠' });
+                return `Both players have Two Pair with ${getCardName({ value: selectedPairValues[0], suit: '♠' })}s as high pair, but ${actualWinner.name} wins with ${actualLowPair}s vs ${selectedPlayer.name}'s ${selectedLowPair}s as second pair.`;
+            }
+            
+            // Same pairs, compare kickers
+            const selectedKicker = selectedCards.find(card => card.value !== selectedPairValues[0] && card.value !== selectedPairValues[1]);
+            const actualKicker = actualCards.find(card => card.value !== actualPairValues[0] && card.value !== actualPairValues[1]);
+            
+            if (selectedKicker.value !== actualKicker.value) {
+                const selectedKickerName = getCardName(selectedKicker);
+                const actualKickerName = getCardName(actualKicker);
+                return `Both players have identical Two Pair (${getCardName({ value: selectedPairValues[0], suit: '♠' })}s and ${getCardName({ value: selectedPairValues[1], suit: '♠' })}s), but ${actualWinner.name} wins with ${actualKickerName} kicker vs ${selectedPlayer.name}'s ${selectedKickerName} kicker.`;
+            }
+            
+            return `Both players have identical Two Pair and kickers. This should be a tie, but ${actualWinner.name} wins due to suit ranking.`;
+        }
+        
+        // Helper function to get card counts
+        function getCardCounts(cards) {
+            const counts = {};
+            for (let card of cards) {
+                counts[card.value] = (counts[card.value] || 0) + 1;
+            }
+            return counts;
         }
         
         function getThreeOfAKindComparison(selectedPlayer, actualWinner) {
-            return `Both players have Three of a Kind, but ${actualWinner.name} has higher three matching cards.`;
+            const selectedCards = [...selectedPlayer.holeCards, ...gameState.communityCards];
+            const actualCards = [...actualWinner.holeCards, ...gameState.communityCards];
+            
+            const selectedCounts = getCardCounts(selectedCards);
+            const actualCounts = getCardCounts(actualCards);
+            
+            const selectedThreeValue = Object.entries(selectedCounts).find(([value, count]) => count === 3)[0];
+            const actualThreeValue = Object.entries(actualCounts).find(([value, count]) => count === 3)[0];
+            
+            if (selectedThreeValue !== actualThreeValue) {
+                const selectedThreeName = getCardName({ value: parseInt(selectedThreeValue), suit: '♠' });
+                const actualThreeName = getCardName({ value: parseInt(actualThreeValue), suit: '♠' });
+                return `${selectedPlayer.name} has Three of a Kind: ${selectedThreeName}s, but ${actualWinner.name} has Three of a Kind: ${actualThreeName}s. ${actualThreeName}s beat ${selectedThreeName}s.`;
+            }
+            
+            // Same three of a kind, compare kickers
+            const selectedKickers = selectedCards
+                .filter(card => card.value !== parseInt(selectedThreeValue))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 2);
+            
+            const actualKickers = actualCards
+                .filter(card => card.value !== parseInt(actualThreeValue))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 2);
+            
+            for (let i = 0; i < 2; i++) {
+                if (selectedKickers[i].value !== actualKickers[i].value) {
+                    const selectedKickerName = getCardName(selectedKickers[i]);
+                    const actualKickerName = getCardName(actualKickers[i]);
+                    return `Both players have Three of a Kind: ${getCardName({ value: parseInt(selectedThreeValue), suit: '♠' })}s, but ${actualWinner.name} wins with ${actualKickerName} kicker vs ${selectedPlayer.name}'s ${selectedKickerName} kicker.`;
+                }
+            }
+            
+            return `Both players have identical Three of a Kind and kickers. This should be a tie, but ${actualWinner.name} wins due to suit ranking.`;
         }
         
         function getStraightComparison(selectedPlayer, actualWinner) {
-            return `Both players have a Straight, but ${actualWinner.name} has a higher straight (higher top card).`;
+            const selectedCards = [...selectedPlayer.holeCards, ...gameState.communityCards];
+            const actualCards = [...actualWinner.holeCards, ...gameState.communityCards];
+            
+            // Find the highest straight for each player
+            const selectedStraight = findHighestStraight(selectedCards);
+            const actualStraight = findHighestStraight(actualCards);
+            
+            if (selectedStraight[0].value !== actualStraight[0].value) {
+                const selectedTopCard = getCardName(selectedStraight[0]);
+                const actualTopCard = getCardName(actualStraight[0]);
+                return `Both players have a Straight, but ${actualWinner.name} has ${actualTopCard} high vs ${selectedPlayer.name}'s ${selectedTopCard} high. ${actualTopCard} beats ${selectedTopCard}.`;
+            }
+            
+            return `Both players have identical Straight. This should be a tie, but ${actualWinner.name} wins due to suit ranking.`;
+        }
+        
+        // Helper function to find the highest straight
+        function findHighestStraight(cards) {
+            const sorted = cards.sort((a, b) => b.value - a.value);
+            
+            // Check for 5 consecutive cards starting from the highest
+            for (let i = 0; i <= sorted.length - 5; i++) {
+                let consecutive = true;
+                for (let j = 0; j < 4; j++) {
+                    if (sorted[i + j].value - sorted[i + j + 1].value !== 1) {
+                        consecutive = false;
+                        break;
+                    }
+                }
+                if (consecutive) {
+                    return sorted.slice(i, i + 5);
+                }
+            }
+            return [];
         }
         
         function getFlushComparison(selectedPlayer, actualWinner) {
-            return `Both players have a Flush, but ${actualWinner.name} has higher cards in the flush.`;
+            const selectedCards = [...selectedPlayer.holeCards, ...gameState.communityCards];
+            const actualCards = [...actualWinner.holeCards, ...gameState.communityCards];
+            
+            // Find the flush suit
+            const selectedSuits = {};
+            const actualSuits = {};
+            
+            for (let card of selectedCards) {
+                selectedSuits[card.suit] = (selectedSuits[card.suit] || 0) + 1;
+            }
+            for (let card of actualCards) {
+                actualSuits[card.suit] = (actualSuits[card.suit] || 0) + 1;
+            }
+            
+            const selectedFlushSuit = Object.entries(selectedSuits).find(([suit, count]) => count >= 5)[0];
+            const actualFlushSuit = Object.entries(actualSuits).find(([suit, count]) => count >= 5)[0];
+            
+            const selectedFlushCards = selectedCards
+                .filter(card => card.suit === selectedFlushSuit)
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 5);
+            
+            const actualFlushCards = actualCards
+                .filter(card => card.suit === actualFlushSuit)
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 5);
+            
+            for (let i = 0; i < 5; i++) {
+                if (selectedFlushCards[i].value !== actualFlushCards[i].value) {
+                    const selectedCardName = getCardName(selectedFlushCards[i]);
+                    const actualCardName = getCardName(actualFlushCards[i]);
+                    if (i === 0) {
+                        return `Both players have a ${getSuitName(selectedFlushSuit)} flush, but ${actualWinner.name} has ${actualCardName} vs ${selectedPlayer.name}'s ${selectedCardName} as the highest card.`;
+                    } else {
+                        return `Both players have the same ${i} highest cards in their ${getSuitName(selectedFlushSuit)} flush, but ${actualWinner.name} wins with ${actualCardName} vs ${selectedPlayer.name}'s ${selectedCardName}.`;
+                    }
+                }
+            }
+            
+            return `Both players have identical ${getSuitName(selectedFlushSuit)} flush. This should be a tie, but ${actualWinner.name} wins due to suit ranking.`;
         }
         
         function getFullHouseComparison(selectedPlayer, actualWinner) {
-            return `Both players have a Full House, but ${actualWinner.name} has higher three matching cards.`;
+            const selectedCards = [...selectedPlayer.holeCards, ...gameState.communityCards];
+            const actualCards = [...actualWinner.holeCards, ...gameState.communityCards];
+            
+            const selectedCounts = getCardCounts(selectedCards);
+            const actualCounts = getCardCounts(actualCards);
+            
+            const selectedThreeValue = Object.entries(selectedCounts).find(([value, count]) => count === 3)[0];
+            const actualThreeValue = Object.entries(actualCounts).find(([value, count]) => count === 3)[0];
+            
+            const selectedTwoValue = Object.entries(selectedCounts).find(([value, count]) => count === 2)[0];
+            const actualTwoValue = Object.entries(actualCounts).find(([value, count]) => count === 2)[0];
+            
+            if (selectedThreeValue !== actualThreeValue) {
+                const selectedThreeName = getCardName({ value: parseInt(selectedThreeValue), suit: '♠' });
+                const actualThreeName = getCardName({ value: parseInt(actualThreeValue), suit: '♠' });
+                return `${selectedPlayer.name} has Full House: ${selectedThreeName}s full of ${getCardName({ value: parseInt(selectedTwoValue), suit: '♠' })}s, but ${actualWinner.name} has Full House: ${actualThreeName}s full of ${getCardName({ value: parseInt(actualTwoValue), suit: '♠' })}s. ${actualThreeName}s beat ${selectedThreeName}s.`;
+            }
+            
+            // Same three of a kind, compare the pair
+            if (selectedTwoValue !== actualTwoValue) {
+                const selectedTwoName = getCardName({ value: parseInt(selectedTwoValue), suit: '♠' });
+                const actualTwoName = getCardName({ value: parseInt(actualTwoValue), suit: '♠' });
+                return `Both players have Full House with ${getCardName({ value: parseInt(selectedThreeValue), suit: '♠' })}s as three of a kind, but ${actualWinner.name} wins with ${actualTwoName}s vs ${selectedPlayer.name}'s ${selectedTwoName}s as the pair.`;
+            }
+            
+            return `Both players have identical Full House. This should be a tie, but ${actualWinner.name} wins due to suit ranking.`;
         }
         
         function getFourOfAKindComparison(selectedPlayer, actualWinner) {
-            return `Both players have Four of a Kind, but ${actualWinner.name} has higher four matching cards.`;
+            const selectedCards = [...selectedPlayer.holeCards, ...gameState.communityCards];
+            const actualCards = [...actualWinner.holeCards, ...gameState.communityCards];
+            
+            const selectedCounts = getCardCounts(selectedCards);
+            const actualCounts = getCardCounts(actualCards);
+            
+            const selectedFourValue = Object.entries(selectedCounts).find(([value, count]) => count === 4)[0];
+            const actualFourValue = Object.entries(actualCounts).find(([value, count]) => count === 4)[0];
+            
+            if (selectedFourValue !== actualFourValue) {
+                const selectedFourName = getCardName({ value: parseInt(selectedFourValue), suit: '♠' });
+                const actualFourName = getCardName({ value: parseInt(actualFourValue), suit: '♠' });
+                return `${selectedPlayer.name} has Four of a Kind: ${selectedFourName}s, but ${actualWinner.name} has Four of a Kind: ${actualFourName}s. ${actualFourName}s beat ${selectedFourName}s.`;
+            }
+            
+            // Same four of a kind, compare kicker
+            const selectedKicker = selectedCards.find(card => card.value !== parseInt(selectedFourValue));
+            const actualKicker = actualCards.find(card => card.value !== parseInt(actualFourValue));
+            
+            if (selectedKicker.value !== actualKicker.value) {
+                const selectedKickerName = getCardName(selectedKicker);
+                const actualKickerName = getCardName(actualKicker);
+                return `Both players have Four of a Kind: ${getCardName({ value: parseInt(selectedFourValue), suit: '♠' })}s, but ${actualWinner.name} wins with ${actualKickerName} kicker vs ${selectedPlayer.name}'s ${selectedKickerName} kicker.`;
+            }
+            
+            return `Both players have identical Four of a Kind and kickers. This should be a tie, but ${actualWinner.name} wins due to suit ranking.`;
         }
         
         // Helper function to get card name
@@ -1443,6 +1839,7 @@
         
         // Initialize game
         initGame();
+        
 
 
     </script>

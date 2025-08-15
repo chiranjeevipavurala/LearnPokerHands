@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Hand Evaluator - Learning Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a472a, #2d5a3d);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .header h1 {
+            margin: 0 0 15px 0;
+            font-size: 2.5em;
+            font-weight: 300;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        
+        .header p {
+            margin: 0;
+            font-size: 1.2em;
+            opacity: 0.9;
+            text-shadow: 0 1px 5px rgba(0,0,0,0.3);
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+            padding: 25px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .control-group label {
+            color: white;
+            font-weight: 500;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        
+        select {
+            padding: 12px 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        select:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.5);
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        button:hover::before {
+            left: 100%;
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+            background: linear-gradient(135deg, #45a049, #4CAF50);
+        }
+        
+        button:active {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        button:disabled {
+            background: linear-gradient(135deg, #666, #555);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        #resetBtn {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        #resetBtn:hover {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            box-shadow: 0 8px 25px rgba(231, 76, 60, 0.5);
+        }
+        
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        
+        .community-cards {
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .community-cards h3 {
+            margin: 0 0 20px 0;
+            color: #f39c12;
+            font-size: 1.5em;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .card {
+            display: inline-block;
+            width: 65px;
+            height: 85px;
+            background: linear-gradient(135deg, #fff, #f8f9fa);
+            color: #333;
+            border-radius: 8px;
+            margin: 0 8px;
+            text-align: center;
+            line-height: 85px;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .card:hover {
+            transform: translateY(-8px) scale(1.05);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .card.hidden {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .card.hidden:hover {
+            transform: translateY(-8px) scale(1.05);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+        }
+        
+        .player {
+            background: rgba(255,255,255,0.1);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .player:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        }
+        
+        .player h3 {
+            margin: 0 0 20px 0;
+            color: #f39c12;
+            font-size: 1.4em;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .player-cards {
+            margin-bottom: 20px;
+        }
+        
+        .probability {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #2ecc71;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        
+        .winner-btn {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        .winner-btn:hover {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(231, 76, 60, 0.5);
+        }
+        
+        .winner-btn.selected {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+        }
+        
+        .winner-btn.selected:hover {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            box-shadow: 0 8px 25px rgba(39, 174, 96, 0.5);
+        }
+        
+        .message {
+            text-align: center;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 25px 0;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            cursor: default;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .message:hover {
+            transform: scale(1.02);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        }
+        
+        .success {
+            background: rgba(39, 174, 96, 0.2);
+            border: 2px solid rgba(39, 174, 96, 0.5);
+        }
+        
+        .error {
+            background: rgba(231, 76, 60, 0.2);
+            border: 2px solid rgba(231, 76, 60, 0.5);
+        }
+        
+        .hand-explanation {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            cursor: default;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .hand-explanation:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .message {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        
+        .message:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎰 Poker Hand Evaluator - Learning Game</h1>
+            <p>Learn to evaluate poker hands by predicting winners at each stage</p>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="playerCount">Number of Players:</label>
+                <select id="playerCount">
+                    <option value="2">2 Players</option>
+                    <option value="3">3 Players</option>
+                    <option value="4">4 Players</option>
+                    <option value="5">5 Players</option>
+                    <option value="6">6 Players</option>
+                    <option value="7">7 Players</option>
+                    <option value="8">8 Players</option>
+                    <option value="9">9 Players</option>
+                </select>
+            </div>
+            
+            <button id="dealBtn" onclick="dealCards()">Deal Cards</button>
+            <button id="flopBtn" onclick="dealFlop()" disabled>Deal Flop</button>
+            <button id="turnBtn" onclick="dealTurn()" disabled>Deal Turn</button>
+            <button id="riverBtn" onclick="dealRiver()" disabled>Deal River</button>
+            <button id="resetBtn" onclick="resetGame()" style="background: #e74c3c;">Reset Game</button>
+        </div>
+        
+        <div class="game-area">
+            <div class="community-cards">
+                <h3>Community Cards</h3>
+                <div id="communityCards"></div>
+            </div>
+            
+            <div id="playersGrid" class="players-grid"></div>
+            
+            <div id="messageArea"></div>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let gameState = {
+            players: [],
+            communityCards: [],
+            deck: [],
+            currentStage: 'preflop', // preflop, flop, turn, river
+            selectedWinner: null
+        };
+        
+        // Card suits and ranks
+        const suits = ['♠', '♥', '♦', '♣'];
+        const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        
+        // Initialize game
+        function initGame() {
+            createDeck();
+            shuffleDeck();
+            setupPlayers();
+            updateDisplay();
+        }
+        
+        // Create and shuffle deck
+        function createDeck() {
+            gameState.deck = [];
+            for (let suit of suits) {
+                for (let rank of ranks) {
+                    gameState.deck.push({ rank, suit, value: getCardValue(rank) });
+                }
+            }
+        }
+        
+        function shuffleDeck() {
+            for (let i = gameState.deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [gameState.deck[i], gameState.deck[j]] = [gameState.deck[j], gameState.deck[i]];
+            }
+        }
+        
+        function getCardValue(rank) {
+            if (rank === 'A') return 14;
+            if (rank === 'K') return 13;
+            if (rank === 'Q') return 12;
+            if (rank === 'J') return 11;
+            return parseInt(rank);
+        }
+        
+        // Setup players
+        function setupPlayers() {
+            const playerCount = parseInt(document.getElementById('playerCount').value);
+            gameState.players = [];
+            
+            for (let i = 0; i < playerCount; i++) {
+                gameState.players.push({
+                    id: i,
+                    name: `Player ${i + 1}`,
+                    holeCards: [],
+                    probability: 0,
+                    isWinner: false
+                });
+            }
+        }
+        
+        // Deal initial cards
+        function dealCards() {
+            if (gameState.currentStage !== 'preflop') {
+                resetGame();
+            }
+            
+            // Deal 2 cards to each player
+            for (let player of gameState.players) {
+                player.holeCards = [gameState.deck.pop(), gameState.deck.pop()];
+            }
+            
+            gameState.currentStage = 'dealt';
+            calculateProbabilities();
+            updateDisplay();
+            updateButtons();
+            
+            showMessage('Cards dealt! Select who you think will win, then deal the flop.', 'info');
+        }
+        
+        // Deal flop
+        function dealFlop() {
+            if (gameState.currentStage !== 'dealt') return;
+            
+            gameState.communityCards = [
+                gameState.deck.pop(),
+                gameState.deck.pop(),
+                gameState.deck.pop()
+            ];
+            
+            gameState.currentStage = 'flop';
+            calculateProbabilities();
+            updateDisplay();
+            updateButtons();
+            
+            showMessage('Flop dealt! Select who you think will win, then deal the turn.', 'info');
+        }
+        
+        // Deal turn
+        function dealTurn() {
+            if (gameState.currentStage !== 'flop') return;
+            
+            gameState.communityCards.push(gameState.deck.pop());
+            gameState.currentStage = 'turn';
+            calculateProbabilities();
+            updateDisplay();
+            updateButtons();
+            
+            showMessage('Turn dealt! Select who you think will win, then deal the river.', 'info');
+        }
+        
+        // Deal river
+        function dealRiver() {
+            if (gameState.currentStage !== 'turn') return;
+            
+            gameState.communityCards.push(gameState.deck.pop());
+            gameState.currentStage = 'river';
+            calculateProbabilities();
+            updateDisplay();
+            updateButtons();
+            
+            showMessage('River dealt! Select who you think will win, then evaluate!', 'info');
+        }
+        
+        // Calculate winning probabilities
+        function calculateProbabilities() {
+            // Don't calculate probabilities if no cards are dealt yet
+            if (gameState.currentStage === 'preflop') {
+                for (let player of gameState.players) {
+                    player.probability = 0;
+                }
+                return;
+            }
+            
+            // Calculate probabilities based on current game stage
+            for (let player of gameState.players) {
+                let probability = 0;
+                
+                if (gameState.currentStage === 'dealt') {
+                    // Preflop: based on hole card strength (0-100 scale)
+                    probability = calculateHoleCardStrength(player.holeCards);
+                } else {
+                    // Post-flop: based on hand ranking and potential
+                    probability = calculatePostFlopProbability(player.holeCards, gameState.communityCards, gameState.currentStage);
+                }
+                
+                player.probability = Math.round(probability);
+            }
+            
+            // Normalize probabilities to sum to 100%
+            const total = gameState.players.reduce((sum, p) => sum + p.probability, 0);
+            if (total > 0) {
+                for (let player of gameState.players) {
+                    player.probability = Math.round((player.probability / total) * 100);
+                }
+            }
+        }
+        
+        // Calculate probability for post-flop hands
+        function calculatePostFlopProbability(holeCards, communityCards, stage) {
+            const handRank = getHandRankAtStage([...holeCards, ...communityCards], stage);
+            let probability = 0;
+            
+            // Base probability from hand strength
+            switch (handRank.name) {
+                case 'Royal Flush':
+                case 'Straight Flush':
+                    probability = 95;
+                    break;
+                case 'Four of a Kind':
+                    probability = 90;
+                    break;
+                case 'Full House':
+                    probability = 85;
+                    break;
+                case 'Flush':
+                    probability = 80;
+                    break;
+                case 'Straight':
+                    probability = 75;
+                    break;
+                case 'Three of a Kind':
+                    probability = 70;
+                    break;
+                case 'Two Pair':
+                    probability = 65;
+                    break;
+                case 'One Pair':
+                    probability = 60;
+                    break;
+                case 'High Card':
+                    probability = 40;
+                    break;
+            }
+            
+            // Adjust based on remaining cards to be dealt
+            if (stage === 'flop') {
+                // 2 more cards coming - high potential for improvement
+                probability += Math.random() * 20; // Add some randomness for realistic feel
+            } else if (stage === 'turn') {
+                // 1 more card coming - moderate potential
+                probability += Math.random() * 10;
+            } else if (stage === 'river') {
+                // Final hand - no more improvement possible
+                // Keep base probability
+            }
+            
+            // Ensure probability stays within bounds
+            return Math.min(100, Math.max(0, probability));
+        }
+        
+        function calculateHoleCardStrength(holeCards) {
+            // Return 0 if no cards are dealt
+            if (!holeCards || holeCards.length < 2) {
+                return 0;
+            }
+            
+            let strength = 0;
+            
+            // High card value (0-14 scale, convert to 0-20)
+            strength += Math.max(holeCards[0].value, holeCards[1].value) * 1.4;
+            
+            // Pairs (biggest boost)
+            if (holeCards[0].value === holeCards[1].value) {
+                strength += 40;
+            }
+            
+            // Suited cards
+            if (holeCards[0].suit === holeCards[1].suit) {
+                strength += 15;
+            }
+            
+            // Connected cards
+            const diff = Math.abs(holeCards[0].value - holeCards[1].value);
+            if (diff === 1) strength += 20; // Connected
+            if (diff === 2) strength += 15; // 1 gap
+            if (diff === 3) strength += 10; // 2 gap
+            
+            // Ensure strength stays within 0-100 range
+            return Math.min(100, Math.max(0, strength));
+        }
+        
+        function evaluateHandStrength(holeCards, communityCards) {
+            const allCards = [...holeCards, ...communityCards];
+            const handRank = getHandRank(allCards);
+            return handRank.score;
+        }
+        
+        function getHandRank(cards) {
+            // Simplified hand ranking
+            const sorted = cards.sort((a, b) => b.value - a.value);
+            const counts = {};
+            const suits = {};
+            
+            for (let card of cards) {
+                counts[card.value] = (counts[card.value] || 0) + 1;
+                suits[card.suit] = (suits[card.suit] || 0) + 1;
+            }
+            
+            const pairs = Object.values(counts).filter(c => c >= 2);
+            const isFlush = Object.values(suits).some(c => c >= 5);
+            const isStraight = checkStraight(sorted);
+            
+            if (isFlush && isStraight) return { name: 'Straight Flush', score: 800 };
+            if (pairs.includes(4)) return { name: 'Four of a Kind', score: 700 };
+            if (pairs.includes(3) && pairs.includes(2)) return { name: 'Full House', score: 600 };
+            if (isFlush) return { name: 'Flush', score: 500 };
+            if (isStraight) return { name: 'Straight', score: 400 };
+            if (pairs.includes(3)) return { name: 'Three of a Kind', score: 300 };
+            if (pairs.filter(c => c === 2).length >= 2) return { name: 'Two Pair', score: 200 };
+            if (pairs.includes(2)) return { name: 'One Pair', score: 100 };
+            
+            return { name: 'High Card', score: sorted[0].value };
+        }
+        
+        function checkStraight(cards) {
+            for (let i = 0; i < cards.length - 4; i++) {
+                if (cards[i].value - cards[i + 4].value === 4) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // Helper function to get high card name
+        function getHighCardName(cards) {
+            const sorted = cards.sort((a, b) => b.value - a.value);
+            const highCard = sorted[0];
+            
+            // Convert numeric values to card names
+            let cardName = '';
+            switch (highCard.value) {
+                case 14: cardName = 'Ace'; break;
+                case 13: cardName = 'King'; break;
+                case 12: cardName = 'Queen'; break;
+                case 11: cardName = 'Jack'; break;
+                default: cardName = highCard.value.toString();
+            }
+            
+            return `${cardName} of ${getSuitName(highCard.suit)}`;
+        }
+        
+        // Helper function to get suit name
+        function getSuitName(suit) {
+            switch (suit) {
+                case '♠': return 'Spades';
+                case '♥': return 'Hearts';
+                case '♦': return 'Diamonds';
+                case '♣': return 'Clubs';
+                default: return suit;
+            }
+        }
+        
+        // New function to find all winners (handles ties)
+        function findWinners() {
+            let bestScore = -1;
+            let winners = [];
+            
+            // First pass: find the best score based on current game stage
+            for (let i = 0; i < gameState.players.length; i++) {
+                const score = evaluateHandStrengthAtStage(gameState.players[i].holeCards, gameState.communityCards, gameState.currentStage);
+                if (score > bestScore) {
+                    bestScore = score;
+                }
+            }
+            
+            // Second pass: find all players with the best score
+            for (let i = 0; i < gameState.players.length; i++) {
+                const score = evaluateHandStrengthAtStage(gameState.players[i].holeCards, gameState.communityCards, gameState.currentStage);
+                if (score === bestScore) {
+                    winners.push({
+                        id: i,
+                        name: gameState.players[i].name,
+                        holeCards: gameState.players[i].holeCards,
+                        score: score
+                    });
+                }
+            }
+            
+            // If there are ties, break them with kickers
+            if (winners.length > 1) {
+                winners = breakTies(winners);
+            }
+            
+            return winners;
+        }
+        
+        // New function to break ties using kickers
+        function breakTies(winners) {
+            if (winners.length <= 1) return winners;
+            
+            // Get the hand type for all winners based on current stage
+            const handType = getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage).name;
+            
+            // For different hand types, we need different tie-breaking logic
+            if (handType === 'High Card') {
+                return breakHighCardTie(winners);
+            } else if (handType === 'One Pair') {
+                return breakOnePairTie(winners);
+            } else if (handType === 'Two Pair') {
+                return breakTwoPairTie(winners);
+            } else if (handType === 'Three of a Kind') {
+                return breakThreeOfAKindTie(winners);
+            } else if (handType === 'Straight') {
+                return breakStraightTie(winners);
+            } else if (handType === 'Flush') {
+                return breakFlushTie(winners);
+            } else if (handType === 'Full House') {
+                return breakFullHouseTie(winners);
+            } else if (handType === 'Four of a Kind') {
+                return breakFourOfAKindTie(winners);
+            } else if (handType === 'Straight Flush') {
+                return breakStraightTie(winners); // Same as straight
+            }
+            
+            // For hands that can't tie (like Royal Flush), return all winners
+            return winners;
+        }
+        
+        // Helper function to break high card ties
+        function breakHighCardTie(winners) {
+            // Sort winners by their 5 highest cards (kickers)
+            winners.sort((a, b) => {
+                const aCards = [...a.holeCards, ...gameState.communityCards].sort((x, y) => y.value - x.value).slice(0, 5);
+                const bCards = [...b.holeCards, ...gameState.communityCards].sort((x, y) => y.value - x.value).slice(0, 5);
+                
+                for (let i = 0; i < 5; i++) {
+                    if (aCards[i].value !== bCards[i].value) {
+                        return bCards[i].value - aCards[i].value;
+                    }
+                }
+                return 0; // Complete tie
+            });
+            
+            // Return only the highest (first after sorting)
+            return [winners[0]];
+        }
+        
+        // Helper function to break one pair ties
+        function breakOnePairTie(winners) {
+            // Sort by pair value first, then by kickers
+            winners.sort((a, b) => {
+                const aPair = findPairValue([...a.holeCards, ...gameState.communityCards]);
+                const bPair = findPairValue([...b.holeCards, ...gameState.communityCards]);
+                
+                if (aPair !== bPair) {
+                    return bPair - aPair;
+                }
+                
+                // Same pair, check kickers
+                const aKickers = getKickers([...a.holeCards, ...gameState.communityCards], aPair);
+                const bKickers = getKickers([...b.holeCards, ...gameState.communityCards], bPair);
+                
+                for (let i = 0; i < 3; i++) {
+                    if (aKickers[i] !== bKickers[i]) {
+                        return bKickers[i] - aKickers[i];
+                    }
+                }
+                return 0;
+            });
+            
+            return [winners[0]];
+        }
+        
+        // Helper function to find pair value
+        function findPairValue(cards) {
+            const counts = {};
+            for (let card of cards) {
+                counts[card.value] = (counts[card.value] || 0) + 1;
+            }
+            for (let [value, count] of Object.entries(counts)) {
+                if (count === 2) return parseInt(value);
+            }
+            return 0;
+        }
+        
+        // Helper function to get kickers (excluding the pair)
+        function getKickers(cards, pairValue) {
+            return cards
+                .filter(card => card.value !== pairValue)
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 3)
+                .map(card => card.value);
+        }
+        
+        // Placeholder functions for other tie-breaking scenarios
+        function breakTwoPairTie(winners) { return [winners[0]]; }
+        function breakThreeOfAKindTie(winners) { return [winners[0]]; }
+        function breakStraightTie(winners) { return [winners[0]]; }
+        function breakFlushTie(winners) { return [winners[0]]; }
+        function breakFullHouseTie(winners) { return [winners[0]]; }
+        function breakFourOfAKindTie(winners) { return [winners[0]]; }
+        
+        // Function to get detailed explanation of why a player won
+        function getDetailedWinExplanation(selectedPlayer, actualWinner) {
+            const selectedHand = getHandRankAtStage([...selectedPlayer.holeCards, ...gameState.communityCards], gameState.currentStage);
+            const actualHand = getHandRankAtStage([...actualWinner.holeCards, ...gameState.communityCards], gameState.currentStage);
+            
+            // If hands are different types, explain the hand ranking
+            if (selectedHand.name !== actualHand.name) {
+                return `${selectedPlayer.name} has ${selectedHand.name} but ${actualWinner.name} has ${actualHand.name}. ${actualHand.name} beats ${selectedHand.name} in poker hand rankings.`;
+            }
+            
+            // If hands are the same type, explain why one is better
+            if (selectedHand.name === 'High Card') {
+                return getHighCardComparison(selectedPlayer, actualWinner);
+            } else if (selectedHand.name === 'One Pair') {
+                return getOnePairComparison(selectedPlayer, actualWinner);
+            } else if (selectedHand.name === 'Two Pair') {
+                return getTwoPairComparison(selectedPlayer, actualWinner);
+            } else if (selectedHand.name === 'Three of a Kind') {
+                return getThreeOfAKindComparison(selectedPlayer, actualWinner);
+            } else if (selectedHand.name === 'Straight') {
+                return getStraightComparison(selectedPlayer, actualWinner);
+            } else if (selectedHand.name === 'Flush') {
+                return getFlushComparison(selectedPlayer, actualWinner);
+            } else if (selectedHand.name === 'Full House') {
+                return getFullHouseComparison(selectedPlayer, actualWinner);
+            } else if (selectedHand.name === 'Four of a Kind') {
+                return getFourOfAKindComparison(selectedPlayer, actualWinner);
+            }
+            
+            return `Both players have ${selectedHand.name}, but ${actualWinner.name} has a stronger version.`;
+        }
+        
+        // Function to get tie explanation
+        function getTieExplanation(winners) {
+            const handType = getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage).name;
+            return `All tied players have exactly the same ${handType} with identical kickers, making this a true tie.`;
+        }
+        
+        // Detailed comparison functions for different hand types
+        function getHighCardComparison(selectedPlayer, actualWinner) {
+            const selectedCards = [...selectedPlayer.holeCards, ...gameState.communityCards].sort((a, b) => b.value - a.value).slice(0, 5);
+            const actualCards = [...actualWinner.holeCards, ...gameState.communityCards].sort((a, b) => b.value - a.value).slice(0, 5);
+            
+            for (let i = 0; i < 5; i++) {
+                if (selectedCards[i].value !== actualCards[i].value) {
+                    const selectedCardName = getCardName(selectedCards[i]);
+                    const actualCardName = getCardName(actualCards[i]);
+                    if (i === 0) {
+                        return `${selectedPlayer.name} has ${selectedCardName} as high card, but ${actualWinner.name} has ${actualCardName}. ${actualCardName} beats ${selectedCardName}.`;
+                    } else {
+                        return `Both players have the same ${i} highest card${i > 1 ? 's' : ''}, but ${actualWinner.name} wins with ${actualCardName} vs ${selectedPlayer.name}'s ${selectedCardName}.`;
+                    }
+                }
+            }
+            return `Both players have identical high cards, but ${actualWinner.name} wins due to suit ranking.`;
+        }
+        
+        function getOnePairComparison(selectedPlayer, actualWinner) {
+            const selectedPair = findPairValue([...selectedPlayer.holeCards, ...gameState.communityCards]);
+            const actualPair = findPairValue([...actualWinner.holeCards, ...gameState.communityCards]);
+            
+            if (selectedPair !== actualPair) {
+                const selectedPairName = getCardName({ value: selectedPair, suit: '♠' });
+                const actualPairName = getCardName({ value: actualPair, suit: '♠' });
+                return `${selectedPlayer.name} has a pair of ${selectedPairName}s, but ${actualWinner.name} has a pair of ${actualPairName}s. ${actualPairName}s beat ${selectedPairName}s.`;
+            }
+            
+            // Same pair, compare kickers
+            const selectedKickers = getKickers([...selectedPlayer.holeCards, ...gameState.communityCards], selectedPair);
+            const actualKickers = getKickers([...actualWinner.holeCards, ...gameState.communityCards], actualPair);
+            
+            for (let i = 0; i < 3; i++) {
+                if (selectedKickers[i] !== actualKickers[i]) {
+                    const selectedKickerName = getCardName({ value: selectedKickers[i], suit: '♠' });
+                    const actualKickerName = getCardName({ value: actualKickers[i], suit: '♠' });
+                    return `Both players have the same pair of ${getCardName({ value: selectedPair, suit: '♠' })}s, but ${actualWinner.name} wins with ${actualKickerName} kicker vs ${selectedPlayer.name}'s ${selectedKickerName} kicker.`;
+                }
+            }
+            
+            return `Both players have identical pairs and kickers, but ${actualWinner.name} wins due to suit ranking.`;
+        }
+        
+        function getTwoPairComparison(selectedPlayer, actualWinner) {
+            return `Both players have Two Pair, but ${actualWinner.name} has higher pairs or better kickers.`;
+        }
+        
+        function getThreeOfAKindComparison(selectedPlayer, actualWinner) {
+            return `Both players have Three of a Kind, but ${actualWinner.name} has higher three matching cards.`;
+        }
+        
+        function getStraightComparison(selectedPlayer, actualWinner) {
+            return `Both players have a Straight, but ${actualWinner.name} has a higher straight (higher top card).`;
+        }
+        
+        function getFlushComparison(selectedPlayer, actualWinner) {
+            return `Both players have a Flush, but ${actualWinner.name} has higher cards in the flush.`;
+        }
+        
+        function getFullHouseComparison(selectedPlayer, actualWinner) {
+            return `Both players have a Full House, but ${actualWinner.name} has higher three matching cards.`;
+        }
+        
+        function getFourOfAKindComparison(selectedPlayer, actualWinner) {
+            return `Both players have Four of a Kind, but ${actualWinner.name} has higher four matching cards.`;
+        }
+        
+        // Helper function to get card name
+        function getCardName(card) {
+            switch (card.value) {
+                case 14: return 'Ace';
+                case 13: return 'King';
+                case 12: return 'Queen';
+                case 11: return 'Jack';
+                default: return card.value.toString();
+            }
+        }
+        
+        // Function to get detailed hand description for tooltips
+        function getDetailedHandDescription(player) {
+            if (gameState.currentStage === 'preflop' || gameState.currentStage === 'dealt') {
+                // No tooltip before flop is dealt
+                return '';
+            }
+            
+            const handRank = getHandRankAtStage([...player.holeCards, ...gameState.communityCards], gameState.currentStage);
+            let description = `${handRank.name}`;
+            
+            // Add specific details for certain hand types
+            if (handRank.name === 'High Card') {
+                const highCard = getHighCardName([...player.holeCards, ...gameState.communityCards]);
+                description += `\n${highCard}`;
+            } else if (handRank.name === 'One Pair') {
+                const pairValue = findPairValue([...player.holeCards, ...gameState.communityCards]);
+                const pairName = getCardName({ value: pairValue, suit: '♠' });
+                description += `\nPair of ${pairName}s`;
+            } else if (handRank.name === 'Two Pair') {
+                description += '\nTwo Pairs';
+            } else if (handRank.name === 'Three of a Kind') {
+                description += '\nThree Matching Cards';
+            } else if (handRank.name === 'Straight') {
+                description += '\nFive Consecutive Cards';
+            } else if (handRank.name === 'Flush') {
+                description += '\nFive Same Suit';
+            } else if (handRank.name === 'Full House') {
+                description += '\nThree + Two Matching';
+            } else if (handRank.name === 'Four of a Kind') {
+                description += '\nFour Matching Cards';
+            } else if (handRank.name === 'Straight Flush') {
+                description += '\nStraight + Same Suit';
+            }
+            
+            return description;
+        }
+        
+        // New function to evaluate hand strength based on current game stage
+        function evaluateHandStrengthAtStage(holeCards, communityCards, stage) {
+            if (stage === 'preflop' || stage === 'dealt') {
+                // Only hole cards are available
+                return calculateHoleCardStrength(holeCards);
+            } else if (stage === 'flop') {
+                // Hole cards + 3 flop cards
+                const availableCards = [...holeCards, ...communityCards.slice(0, 3)];
+                const handRank = getHandRank(availableCards);
+                return handRank.score;
+            } else if (stage === 'turn') {
+                // Hole cards + 4 community cards
+                const availableCards = [...holeCards, ...communityCards.slice(0, 4)];
+                const handRank = getHandRank(availableCards);
+                return handRank.score;
+            } else if (stage === 'river') {
+                // Hole cards + all 5 community cards
+                const availableCards = [...holeCards, ...communityCards];
+                const handRank = getHandRank(availableCards);
+                return handRank.score;
+            }
+            
+            // Fallback to full evaluation
+            return evaluateHandStrength(holeCards, communityCards);
+        }
+        
+        // New function to get hand rank based on current game stage
+        function getHandRankAtStage(cards, stage) {
+            if (stage === 'preflop' || stage === 'dealt') {
+                // Only hole cards - can only have high card
+                const sorted = cards.sort((a, b) => b.value - a.value);
+                return { name: 'High Card', score: sorted[0].value };
+            } else if (stage === 'flop') {
+                // Only first 3 community cards + hole cards
+                const availableCards = cards.slice(0, 5); // 2 hole + 3 flop
+                return getHandRank(availableCards);
+            } else if (stage === 'turn') {
+                // First 4 community cards + hole cards
+                const availableCards = cards.slice(0, 6); // 2 hole + 4 community
+                return getHandRank(availableCards);
+            } else if (stage === 'river') {
+                // All cards available
+                return getHandRank(cards);
+            }
+            
+            // Fallback to full evaluation
+            return getHandRank(cards);
+        }
+        
+        // Select winner
+        function selectWinner(playerId) {
+            gameState.selectedWinner = playerId;
+            
+            // Update button states
+            document.querySelectorAll('.winner-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.querySelector(`[data-player="${playerId}"]`).classList.add('selected');
+            
+            // Automatically evaluate the winner after selection
+            evaluateWinner();
+        }
+        
+        // Evaluate winner
+        function evaluateWinner() {
+            if (gameState.selectedWinner === null) {
+                showMessage('Please select a winner first!', 'error');
+                return;
+            }
+            
+            // Find actual winner(s) - handle ties properly
+            let winners = findWinners();
+            const selectedPlayer = gameState.players[gameState.selectedWinner];
+            
+            let message = '';
+            let messageClass = '';
+            
+            // Check if user's prediction was correct
+            const isCorrect = winners.some(w => w.id === gameState.selectedWinner);
+            
+            if (isCorrect) {
+                messageClass = 'success';
+                if (winners.length === 1) {
+                    message = `🎉 Congratulations! You correctly predicted that ${selectedPlayer.name} would win!`;
+                } else {
+                    message = `🎉 Congratulations! You correctly predicted that ${selectedPlayer.name} would win! (Tied with ${winners.length - 1} other player${winners.length > 2 ? 's' : ''})`;
+                }
+            } else {
+                messageClass = 'error';
+                if (winners.length === 1) {
+                    const actualPlayer = winners[0];
+                    message = `❌ Not right! ${actualPlayer.name} actually won with a ${getHandRank([...actualPlayer.holeCards, ...gameState.communityCards]).name}.`;
+                } else {
+                    const winnerNames = winners.map(w => w.name).join(', ');
+                    message = `❌ Not right! There was a tie between ${winnerNames} with ${getHandRank([...winners[0].holeCards, ...gameState.communityCards]).name}.`;
+                }
+            }
+            
+            // Add hand explanation
+            const selectedHand = getHandRank([...selectedPlayer.holeCards, ...gameState.communityCards]);
+            
+            // Enhanced explanation for high card wins
+            let selectedExplanation = `${selectedPlayer.name} - ${selectedHand.name}`;
+            if (selectedHand.name === 'High Card') {
+                const selectedHighCard = getHighCardName([...selectedPlayer.holeCards, ...gameState.communityCards]);
+                selectedExplanation += ` (${selectedHighCard})`;
+            }
+            
+            let actualExplanation = '';
+            if (winners.length === 1) {
+                const actualHand = getHandRank([...winners[0].holeCards, ...gameState.communityCards]);
+                actualExplanation = `${winners[0].name} - ${actualHand.name}`;
+                if (actualHand.name === 'High Card') {
+                    const actualHighCard = getHighCardName([...winners[0].holeCards, ...gameState.communityCards]);
+                    actualExplanation += ` (${actualHighCard})`;
+                }
+            } else {
+                // Handle ties
+                const tieHand = getHandRank([...winners[0].holeCards, ...gameState.communityCards]);
+                const winnerNames = winners.map(w => w.name).join(', ');
+                actualExplanation = `TIE: ${winnerNames} - ${tieHand.name}`;
+                
+                if (tieHand.name === 'High Card') {
+                    // Show all high cards in the tie
+                    const highCards = winners.map(w => {
+                        const highCard = getHighCardName([...w.holeCards, ...gameState.communityCards]);
+                        return `${w.name}: ${highCard}`;
+                    }).join(', ');
+                    actualExplanation += ` (${highCards})`;
+                }
+            }
+            
+            // Add detailed explanation of why the winner won
+            let detailedExplanation = '';
+            if (winners.length === 1) {
+                detailedExplanation = getDetailedWinExplanation(selectedPlayer, winners[0]);
+            } else {
+                // For ties, explain why they tied
+                detailedExplanation = getTieExplanation(winners);
+            }
+            
+            if (detailedExplanation) {
+                message += `<div class="hand-explanation" style="margin-top: 15px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                    <strong>📚 Why this happened:</strong><br>
+                    ${detailedExplanation}
+                </div>`;
+            }
+            
+            message += `<div class="hand-explanation">
+                <strong>Your selection:</strong> ${selectedExplanation}<br>
+                <strong>Actual result:</strong> ${actualExplanation}
+            </div>`;
+            
+            showMessage(message, messageClass);
+            
+            // Reset selection
+            gameState.selectedWinner = null;
+            document.querySelectorAll('.winner-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+        }
+        
+        // Reset game
+        function resetGame() {
+            gameState.communityCards = [];
+            gameState.currentStage = 'preflop';
+            gameState.selectedWinner = null;
+            gameState.players.forEach(p => {
+                p.holeCards = [];
+                p.probability = 0;
+            });
+            createDeck();
+            shuffleDeck();
+            updateButtons();
+            
+            // Clear any messages
+            document.getElementById('messageArea').innerHTML = '';
+            
+            // Clear community cards display
+            document.getElementById('communityCards').innerHTML = '';
+            
+            // Reset player displays
+            updateDisplay();
+        }
+        
+        // Update display
+        function updateDisplay() {
+            // Update community cards
+            const communityDiv = document.getElementById('communityCards');
+            communityDiv.innerHTML = '';
+            
+            for (let i = 0; i < 5; i++) {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'card';
+                
+                if (i < gameState.communityCards.length) {
+                    const card = gameState.communityCards[i];
+                    cardDiv.textContent = `${card.rank}${card.suit}`;
+                    cardDiv.style.color = (card.suit === '♥' || card.suit === '♦') ? 'red' : 'black';
+                    
+                    // Add tooltip based on which stage this card was dealt
+                    let stageInfo = '';
+                    if (i < 3) {
+                        stageInfo = 'Flop Card';
+                    } else if (i === 3) {
+                        stageInfo = 'Turn Card';
+                    } else {
+                        stageInfo = 'River Card';
+                    }
+                    cardDiv.title = `${stageInfo}: ${card.rank}${card.suit}`;
+                } else {
+                    cardDiv.className += ' hidden';
+                    let stageInfo = '';
+                    if (i === 3) {
+                        stageInfo = 'Turn Card (Not Yet Dealt)';
+                    } else if (i === 4) {
+                        stageInfo = 'River Card (Not Yet Dealt)';
+                    }
+                    cardDiv.textContent = '?';
+                    cardDiv.title = stageInfo;
+                }
+                
+                communityDiv.appendChild(cardDiv);
+            }
+            
+            // Update players
+            const playersGrid = document.getElementById('playersGrid');
+            playersGrid.innerHTML = '';
+            
+            for (let player of gameState.players) {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player';
+                
+                let cardsHtml = '';
+                if (player.holeCards.length > 0) {
+                    // Get detailed hand description for tooltip
+                    const handDescription = getDetailedHandDescription(player);
+                    
+                    for (let card of player.holeCards) {
+                        const color = (card.suit === '♥' || card.suit === '♦') ? 'red' : 'black';
+                        if (handDescription) {
+                            cardsHtml += `<div class="card" style="color: ${color}" title="${handDescription}">${card.rank}${card.suit}</div>`;
+                        } else {
+                            cardsHtml += `<div class="card" style="color: ${color}">${card.rank}${card.suit}</div>`;
+                        }
+                    }
+                } else {
+                    cardsHtml = '<div class="card hidden" title="No cards dealt yet">?</div><div class="card hidden" title="No cards dealt yet">?</div>';
+                }
+                
+                // Only show probability and winner button if cards are dealt
+                let probabilityHtml = '';
+                let winnerButtonHtml = '';
+                
+                if (player.holeCards.length > 0) {
+                    probabilityHtml = `<div class="probability">Win Probability: ${player.probability}%</div>`;
+                    winnerButtonHtml = `<button class="winner-btn" data-player="${player.id}" onclick="selectWinner(${player.id})">
+                        Select as Winner
+                    </button>`;
+                }
+                
+                playerDiv.innerHTML = `
+                    <h3>${player.name}</h3>
+                    <div class="player-cards">${cardsHtml}</div>
+                    ${probabilityHtml}
+                    ${winnerButtonHtml}
+                `;
+                
+                playersGrid.appendChild(playerDiv);
+            }
+        }
+        
+        // Update button states
+        function updateButtons() {
+            const dealBtn = document.getElementById('dealBtn');
+            const flopBtn = document.getElementById('flopBtn');
+            const turnBtn = document.getElementById('turnBtn');
+            const riverBtn = document.getElementById('riverBtn');
+            
+            // Reset button is always enabled
+            // Reset button doesn't need to be managed here
+            
+            if (gameState.currentStage === 'preflop') {
+                // Initial state or after reset
+                dealBtn.disabled = false;
+                flopBtn.disabled = true;
+                turnBtn.disabled = true;
+                riverBtn.disabled = true;
+            } else if (gameState.currentStage === 'dealt') {
+                // After cards are dealt
+                dealBtn.disabled = true;
+                flopBtn.disabled = false;
+                turnBtn.disabled = true;
+                riverBtn.disabled = true;
+            } else if (gameState.currentStage === 'flop') {
+                // After flop is dealt
+                dealBtn.disabled = true;
+                flopBtn.disabled = true;
+                turnBtn.disabled = false;
+                riverBtn.disabled = true;
+            } else if (gameState.currentStage === 'turn') {
+                // After turn is dealt
+                dealBtn.disabled = true;
+                flopBtn.disabled = true;
+                turnBtn.disabled = true;
+                riverBtn.disabled = false;
+            } else if (gameState.currentStage === 'river') {
+                // After river is dealt
+                dealBtn.disabled = true;
+                flopBtn.disabled = true;
+                turnBtn.disabled = true;
+                riverBtn.disabled = true;
+            }
+        }
+        
+        // Show message
+        function showMessage(text, type) {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `<div class="message ${type}" onmouseenter="pauseMessageTimer()" onmouseleave="resumeMessageTimer()">${text}</div>`;
+            
+            // Start the timer
+            startMessageTimer();
+        }
+        
+        // Timer variables for message display
+        let messageTimer = null;
+        let messageTimerPaused = false;
+        
+        // Start message timer
+        function startMessageTimer() {
+            if (messageTimer) {
+                clearTimeout(messageTimer);
+            }
+            messageTimer = setTimeout(() => {
+                if (!messageTimerPaused) {
+                    document.getElementById('messageArea').innerHTML = '';
+                }
+            }, 8000);
+        }
+        
+        // Pause message timer when hovering
+        function pauseMessageTimer() {
+            messageTimerPaused = true;
+        }
+        
+        // Resume message timer when leaving
+        function resumeMessageTimer() {
+            messageTimerPaused = false;
+            // Give user a moment to read, then start timer again
+            setTimeout(() => {
+                if (!messageTimerPaused) {
+                    startMessageTimer();
+                }
+            }, 1000);
+        }
+        
+        // Event listeners
+        document.getElementById('playerCount').addEventListener('change', initGame);
+        
+        // Initialize game
+        initGame();
+    </script>
+</body>
+</html>

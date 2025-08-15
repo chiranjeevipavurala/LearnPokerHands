@@ -1175,12 +1175,12 @@
             gameState.communityCards = [];
             gameState.currentStage = 'preflop';
             gameState.selectedWinner = null;
-            gameState.players.forEach(p => {
-                p.holeCards = [];
-                p.probability = 0;
-            });
+            
+            // Recreate deck and players with current player count
             createDeck();
             shuffleDeck();
+            setupPlayers(); // This will update the player count
+            
             updateButtons();
             
             // Clear any messages

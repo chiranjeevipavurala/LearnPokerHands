@@ -310,13 +310,21 @@
             text-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
         
+        .community-cards > div {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
         .card {
             display: inline-block;
             width: 65px;
             height: 85px;
             background: linear-gradient(135deg, #fff, #f8f9fa);
             color: #333;
-            border-radius: 8px;
+            border-radius: 12px;
             margin: 0 8px;
             text-align: center;
             line-height: 85px;
@@ -335,9 +343,14 @@
         }
         
         .card.hidden {
-            background: linear-gradient(135deg, #2c3e50, #34495e);
-            color: white;
+            background: url('images/pokercardbackside.png') center/contain;
+            background-repeat: no-repeat;
+            color: transparent;
             border: 1px solid rgba(255,255,255,0.1);
+            line-height: normal;
+            border-radius: 12px;
+            overflow: hidden;
+            background-color: #2c3e50;
         }
         
         .card.hidden:hover {
@@ -376,6 +389,10 @@
         
         .player-cards {
             margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
         }
         
         .probability {
@@ -1870,7 +1887,7 @@
                     } else if (i === 4) {
                         stageInfo = 'River Card (Not Yet Dealt)';
                     }
-                    cardDiv.textContent = '?';
+                    cardDiv.textContent = '';
                     cardDiv.title = stageInfo;
                 }
                 
@@ -1899,7 +1916,7 @@
                         }
                     }
                 } else {
-                    cardsHtml = '<div class="card hidden" title="No cards dealt yet">?</div><div class="card hidden" title="No cards dealt yet">?</div>';
+                    cardsHtml = '<div class="card hidden" title="No cards dealt yet"></div><div class="card hidden" title="No cards dealt yet"></div>';
                 }
                 
                 // Only show probability and winner button if cards are dealt

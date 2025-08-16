@@ -56,6 +56,128 @@
             text-shadow: 0 1px 5px rgba(0,0,0,0.3);
         }
         
+        /* Instructions Button */
+        .instructions-btn {
+            margin-top: 20px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .instructions-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            background: linear-gradient(135deg, #2980b9, #1f5f8b);
+        }
+        
+        /* Instructions Panel */
+        .instructions-panel {
+            margin-top: 20px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 0;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.3);
+            backdrop-filter: blur(10px);
+            max-height: 0;
+            transition: all 0.4s ease;
+        }
+        
+        .instructions-panel.show {
+            max-height: 80vh;
+            padding: 25px;
+            overflow-y: auto;
+        }
+        
+        .instructions-content {
+            color: #333;
+            max-height: 70vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #888 #f1f1f1;
+        }
+        
+        .instructions-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .instructions-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .instructions-content::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        .instructions-content::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        .instructions-content h3 {
+            margin: 0 0 20px 0;
+            color: #2c3e50;
+            font-size: 1.8em;
+            text-align: center;
+        }
+        
+        .instructions-content h4 {
+            margin: 25px 0 10px 0;
+            color: #34495e;
+            font-size: 1.3em;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        
+        .instructions-content p {
+            margin: 10px 0;
+            line-height: 1.6;
+            color: #555;
+        }
+        
+        .instructions-content ol, .instructions-content ul {
+            margin: 15px 0;
+            padding-left: 25px;
+        }
+        
+        .instructions-content li {
+            margin: 8px 0;
+            line-height: 1.5;
+            color: #555;
+        }
+        
+        .instructions-content strong {
+            color: #2c3e50;
+        }
+        
+        /* Close Button */
+        .close-instructions-btn {
+            display: block;
+            margin: 25px auto 0 auto;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .close-instructions-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
         .controls {
             display: flex;
             justify-content: center;
@@ -360,10 +482,62 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
+                <div class="header">
             <h1>🎰 Poker Hand Evaluator - Learning Game</h1>
             <p>Learn to evaluate poker hands by predicting winners at each stage</p>
-
+            
+            <!-- Instructions Button -->
+            <button id="instructionsBtn" class="instructions-btn" onclick="toggleInstructions()">
+                📖 How to Play
+            </button>
+            
+            <!-- Instructions Panel -->
+            <div id="instructionsPanel" class="instructions-panel" style="display: none;">
+                <div class="instructions-content">
+                    <h3>🎯 Game Instructions</h3>
+                    
+                    <h4>🎮 Objective</h4>
+                    <p>Learn to evaluate poker hands by predicting winners at each stage of Texas Hold'em.</p>
+                    
+                    <h4>📋 How to Play</h4>
+                    <ol>
+                        <li><strong>Select Players:</strong> Choose 2-9 players using the dropdown</li>
+                        <li><strong>Deal Cards:</strong> Click "Deal Cards" to give each player 2 hole cards</li>
+                        <li><strong>Evaluate Preflop:</strong> See win probabilities and select who you think will win</li>
+                        <li><strong>Deal Flop:</strong> Click "Deal Flop" to reveal 3 community cards</li>
+                        <li><strong>Re-evaluate:</strong> Probabilities update - select your winner again</li>
+                        <li><strong>Deal Turn:</strong> Click "Deal Turn" to reveal the 4th community card</li>
+                        <li><strong>Final Evaluation:</strong> Select winner based on 6 visible cards</li>
+                        <li><strong>Deal River:</strong> Click "Deal River" to reveal the final community card</li>
+                        <li><strong>Final Winner:</strong> Select the ultimate winner with all 7 cards visible</li>
+                    </ol>
+                    
+                    <h4>🏆 Hand Rankings (Best to Worst)</h4>
+                    <ol>
+                        <li><strong>Royal Flush:</strong> A, K, Q, J, 10 of same suit</li>
+                        <li><strong>Straight Flush:</strong> 5 consecutive cards of same suit</li>
+                        <li><strong>Four of a Kind:</strong> 4 cards of same rank</li>
+                        <li><strong>Full House:</strong> 3 of a kind + 1 pair</li>
+                        <li><strong>Flush:</strong> 5 cards of same suit</li>
+                        <li><strong>Straight:</strong> 5 consecutive cards</li>
+                        <li><strong>Three of a Kind:</strong> 3 cards of same rank</li>
+                        <li><strong>Two Pair:</strong> 2 different pairs</li>
+                        <li><strong>One Pair:</strong> 2 cards of same rank</li>
+                        <li><strong>High Card:</strong> Highest card wins</li>
+                    </ol>
+                    
+                    <h4>💡 Learning Tips</h4>
+                    <ul>
+                        <li>Start with 2-3 players to learn the basics</li>
+                        <li>Pay attention to how probabilities change at each stage</li>
+                        <li>Use the tooltips on cards to see hand descriptions</li>
+                        <li>Learn from the detailed explanations after each prediction</li>
+                        <li>Practice with different player counts to see various scenarios</li>
+                    </ul>
+                    
+                    <button class="close-instructions-btn" onclick="toggleInstructions()">✕ Close</button>
+                </div>
+            </div>
         </div>
         
         <div class="controls">
@@ -1840,7 +2014,27 @@
         // Initialize game
         initGame();
         
-
+        // Instructions toggle function
+        function toggleInstructions() {
+            const panel = document.getElementById('instructionsPanel');
+            const button = document.getElementById('instructionsBtn');
+            
+            if (panel.style.display === 'none') {
+                // Show instructions
+                panel.style.display = 'block';
+                setTimeout(() => {
+                    panel.classList.add('show');
+                }, 10);
+                button.textContent = '📖 Hide Instructions';
+            } else {
+                // Hide instructions
+                panel.classList.remove('show');
+                setTimeout(() => {
+                    panel.style.display = 'none';
+                }, 400);
+                button.textContent = '📖 How to Play';
+            }
+        }
 
     </script>
 </body>

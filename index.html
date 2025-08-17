@@ -481,6 +481,101 @@
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
         }
         
+        /* Fixed Overlay for Explanations */
+        .explanation-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .explanation-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .explanation-content {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 40px;
+            border-radius: 20px;
+            width: 600px;
+            min-height: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            transform: scale(0.9) translateY(20px);
+            transition: all 0.3s ease;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .explanation-overlay.show .explanation-content {
+            transform: scale(1) translateY(0);
+        }
+        
+        .explanation-content h3 {
+            margin: 0 0 20px 0;
+            color: #f39c12;
+            font-size: 1.8em;
+            text-align: center;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .explanation-content .hand-explanation {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            font-size: 16px;
+            line-height: 1.6;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            flex: 1;
+        }
+        
+        .explanation-content h3 {
+            margin: 0 0 20px 0;
+            color: #f39c12;
+            font-size: 1.8em;
+            text-align: center;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            flex-shrink: 0;
+        }
+        
+        .close-explanation-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .close-explanation-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
         .message {
             text-align: center;
             padding: 20px;
@@ -587,9 +682,17 @@
             
             <div id="playersGrid" class="players-grid"></div>
             
-            <div id="messageArea"></div>
+                    <div id="messageArea"></div>
+    </div>
+    
+    <!-- Fixed Explanation Overlay -->
+    <div id="explanationOverlay" class="explanation-overlay">
+        <div class="explanation-content">
+            <button class="close-explanation-btn" onclick="closeExplanation()">Close</button>
+            <div id="explanationContent"></div>
         </div>
     </div>
+</div>
 
     <script>
         // Game state
@@ -1186,6 +1289,26 @@
         function breakFullHouseTie(winners) { return [winners[0]]; }
         function breakFourOfAKindTie(winners) { return [winners[0]]; }
         
+        // Function to show explanation overlay
+        function showExplanationOverlay(content) {
+            document.getElementById('explanationContent').innerHTML = content;
+            document.getElementById('explanationOverlay').classList.add('show');
+        }
+        
+        // Function to close explanation overlay
+        function closeExplanation() {
+            document.getElementById('explanationOverlay').classList.remove('show');
+        }
+        
+        // Close overlay when clicking outside
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('explanationOverlay').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeExplanation();
+                }
+            });
+        });
+        
         // Function to get detailed explanation of why a player won
         function getDetailedWinExplanation(selectedPlayer, actualWinner) {
             const selectedHand = getHandRankAtStage([...selectedPlayer.holeCards, ...gameState.communityCards], gameState.currentStage);
@@ -1778,31 +1901,28 @@
             let winners = findWinners();
             const selectedPlayer = gameState.players[gameState.selectedWinner];
             
-            let message = '';
-            let messageClass = '';
-            
             // Check if user's prediction was correct
             const isCorrect = winners.some(w => w.id === gameState.selectedWinner);
             
+            // Build the main message
+            let mainMessage = '';
             if (isCorrect) {
-                messageClass = 'success';
                 if (winners.length === 1) {
-                    message = `🎉 Congratulations! You correctly predicted that ${selectedPlayer.name} would win!`;
+                    mainMessage = `You correctly predicted that ${selectedPlayer.name} would win!`;
                 } else {
-                    message = `🎉 Congratulations! You correctly predicted that ${selectedPlayer.name} would win! (Tied with ${winners.length - 1} other player${winners.length > 2 ? 's' : ''})`;
+                    mainMessage = `You correctly predicted that ${selectedPlayer.name} would win! (Tied with ${winners.length - 1} other player${winners.length > 2 ? 's' : ''})`;
                 }
             } else {
-                messageClass = 'error';
                 if (winners.length === 1) {
                     const actualPlayer = winners[0];
-                    message = `❌ Not right! ${actualPlayer.name} actually won with a ${getHandRankAtStage([...actualPlayer.holeCards, ...gameState.communityCards], gameState.currentStage).name}.`;
+                    mainMessage = `${actualPlayer.name} actually won with a ${getHandRankAtStage([...actualPlayer.holeCards, ...gameState.communityCards], gameState.currentStage).name}.`;
                 } else {
                     const winnerNames = winners.map(w => w.name).join(', ');
-                    message = `❌ Not right! There was a tie between ${winnerNames} with ${getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage).name}.`;
+                    mainMessage = `There was a tie between ${winnerNames} with ${getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage).name}.`;
                 }
             }
             
-            // Add hand explanation
+            // Get hand information for explanations
             const selectedHand = getHandRankAtStage([...selectedPlayer.holeCards, ...gameState.communityCards], gameState.currentStage);
             
             // Enhanced explanation for high card wins
@@ -1851,19 +1971,24 @@
                 detailedExplanation = getTieExplanation(winners);
             }
             
-            if (detailedExplanation) {
-                message += `<div class="hand-explanation" style="margin-top: 15px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                    <strong>📚 Why this happened:</strong><br>
-                    ${detailedExplanation}
-                </div>`;
-            }
-            
-            message += `<div class="hand-explanation">
-                <strong>Your selection:</strong> ${selectedExplanation}<br>
-                <strong>Actual result:</strong> ${actualExplanation}
-            </div>`;
-            
-            showMessage(message, messageClass);
+            // Show everything in the unified overlay
+            const overlayContent = `
+                <h3>${isCorrect ? '🎉 Congratulations!' : '❌ Not Right!'}</h3>
+                <div class="hand-explanation" style="background: ${isCorrect ? 'rgba(39, 174, 96, 0.2)' : 'rgba(231, 76, 60, 0.2)'}; border: 2px solid ${isCorrect ? 'rgba(39, 174, 96, 0.5)' : 'rgba(231, 76, 60, 0.5)'};">
+                    ${mainMessage}
+                </div>
+                ${detailedExplanation ? `
+                    <div class="hand-explanation">
+                        <strong>📚 Why this happened:</strong><br>
+                        ${detailedExplanation}
+                    </div>
+                ` : ''}
+                <div class="hand-explanation">
+                    <strong>Your selection:</strong> ${selectedExplanation}<br>
+                    <strong>Actual result:</strong> ${actualExplanation}
+                </div>
+            `;
+            showExplanationOverlay(overlayContent);
             
             // Reset selection
             gameState.selectedWinner = null;

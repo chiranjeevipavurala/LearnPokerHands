@@ -951,15 +951,17 @@
             if (isFlush) return { name: 'Flush', score: 500 };
             if (isStraight) return { name: 'Straight', score: 400 };
             if (pairs.includes(3)) return { name: 'Three of a Kind', score: 300 };
-            if (pairs.filter(c => c === 2).length >= 2) {
+            // Check for Two Pair - count how many values have exactly 2 cards
+            const pairValues = Object.entries(counts)
+                .filter(([value, count]) => count === 2)
+                .map(([value, count]) => parseInt(value))
+                .sort((a, b) => b - a); // Sort pairs in descending order
+            
+            if (pairValues.length >= 2) {
                 // Two Pair - include the values of the pairs in the score
-                const pairValues = Object.entries(counts)
-                    .filter(([value, count]) => count === 2)
-                    .map(([value, count]) => parseInt(value))
-                    .sort((a, b) => b - a); // Sort pairs in descending order
-                
                 const kicker = sorted.find(card => card.value !== pairValues[0] && card.value !== pairValues[1]);
                 const score = 200 + (pairValues[0] * 10) + pairValues[1] + (kicker ? kicker.value : 0);
+                console.log(`Two Pair detected: ${pairValues[0]}s and ${pairValues[1]}s with ${kicker ? getCardName(kicker) : 'no'} kicker`);
                 return { name: 'Two Pair', score: score };
             }
             if (pairs.includes(2)) {
@@ -968,6 +970,7 @@
                 const kickers = sorted.filter(card => card.value !== parseInt(pairValue)).slice(0, 3);
                 const kickerSum = kickers.reduce((sum, card) => sum + card.value, 0);
                 const score = 100 + (parseInt(pairValue) * 10) + kickerSum;
+                console.log(`One Pair detected: ${getCardName({ value: parseInt(pairValue), suit: '♠' })}s with kickers: ${kickers.map(k => getCardName(k)).join(', ')}`);
                 return { name: 'One Pair', score: score };
             }
             
@@ -1210,6 +1213,10 @@
                 return getFullHouseComparison(selectedPlayer, actualWinner);
             } else if (selectedHand.name === 'Four of a Kind') {
                 return getFourOfAKindComparison(selectedPlayer, actualWinner);
+            } else if (selectedHand.name === 'Straight Flush') {
+                return getStraightFlushComparison(selectedPlayer, actualWinner);
+            } else if (selectedHand.name === 'Royal Flush') {
+                return getRoyalFlushComparison(selectedPlayer, actualWinner);
             }
             
             return `Both players have ${selectedHand.name}, but ${actualWinner.name} has a stronger version.`;
@@ -1538,6 +1545,11 @@
             const selectedFlushSuit = Object.entries(selectedSuits).find(([suit, count]) => count >= 5)[0];
             const actualFlushSuit = Object.entries(actualSuits).find(([suit, count]) => count >= 5)[0];
             
+            // If different suits, the higher suit wins (this is a simplified rule)
+            if (selectedFlushSuit !== actualFlushSuit) {
+                return `Both players have a Flush, but ${actualWinner.name} has ${getSuitName(actualFlushSuit)} flush vs ${selectedPlayer.name}'s ${getSuitName(selectedFlushSuit)} flush. ${getSuitName(actualFlushSuit)} flush beats ${getSuitName(selectedFlushSuit)} flush.`;
+            }
+            
             const selectedFlushCards = selectedCards
                 .filter(card => card.suit === selectedFlushSuit)
                 .sort((a, b) => b.value - a.value)
@@ -1630,6 +1642,29 @@
                 case 11: return 'Jack';
                 default: return card.value.toString();
             }
+        }
+        
+        function getStraightFlushComparison(selectedPlayer, actualWinner) {
+            const selectedCards = [...selectedPlayer.holeCards, ...gameState.communityCards];
+            const actualCards = [...actualWinner.holeCards, ...gameState.communityCards];
+            
+            // Find the highest straight flush for each player
+            const selectedStraightFlush = findHighestStraight(selectedCards);
+            const actualStraightFlush = findHighestStraight(actualCards);
+            
+            if (selectedStraightFlush[0].value !== actualStraightFlush[0].value) {
+                const selectedTopCard = getCardName(selectedStraightFlush[0]);
+                const actualTopCard = getCardName(actualStraightFlush[0]);
+                return `Both players have a Straight Flush, but ${actualWinner.name} has ${actualTopCard} high vs ${selectedPlayer.name}'s ${selectedTopCard} high. ${actualTopCard} beats ${selectedTopCard}.`;
+            }
+            
+            return `Both players have identical Straight Flush. This should be a tie, but ${actualWinner.name} wins due to suit ranking.`;
+        }
+        
+        function getRoyalFlushComparison(selectedPlayer, actualWinner) {
+            // Royal Flush is always the same (A, K, Q, J, 10 of same suit)
+            // The only way to differentiate is by suit ranking
+            return `Both players have Royal Flush, but ${actualWinner.name} wins due to suit ranking.`;
         }
         
         // Function to get detailed hand description for tooltips
@@ -1804,7 +1839,13 @@
             // Add detailed explanation of why the winner won
             let detailedExplanation = '';
             if (winners.length === 1) {
-                detailedExplanation = getDetailedWinExplanation(selectedPlayer, winners[0]);
+                if (isCorrect) {
+                    // User correctly predicted the winner - explain why they won
+                    detailedExplanation = `🎯 ${selectedPlayer.name} won with ${getHandRankAtStage([...selectedPlayer.holeCards, ...gameState.communityCards], gameState.currentStage).name}!`;
+                } else {
+                    // User incorrectly predicted - explain why the selected player lost
+                    detailedExplanation = getDetailedWinExplanation(selectedPlayer, winners[0]);
+                }
             } else {
                 // For ties, explain why they tied
                 detailedExplanation = getTieExplanation(winners);

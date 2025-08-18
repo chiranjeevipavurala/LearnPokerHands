@@ -33,7 +33,7 @@
         
         .header {
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 25px;
             padding: 30px;
             background: rgba(255,255,255,0.1);
             border-radius: 20px;
@@ -180,11 +180,11 @@
         
         .controls {
             display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 40px;
-            flex-wrap: wrap;
-            padding: 25px;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
             background: rgba(255,255,255,0.08);
             border-radius: 15px;
             backdrop-filter: blur(10px);
@@ -192,16 +192,12 @@
             border: 1px solid rgba(255,255,255,0.1);
         }
         
-        .control-group {
+        .controls .button-row {
             display: flex;
+            justify-content: center;
             align-items: center;
             gap: 15px;
-        }
-        
-        .control-group label {
-            color: white;
-            font-weight: 500;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            flex-wrap: wrap;
         }
         
         select {
@@ -568,19 +564,21 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
         
-        .message {
+        .static-message-line {
             text-align: center;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            font-size: 18px;
-            transition: all 0.3s ease;
-            cursor: default;
+            padding: 5px;
+            margin: 8px 0;
+            font-size: 16px;
+            color: white;
+            min-height: 20px;
+            width: 100%;
+            /* Always visible line - never disappears */
         }
         
-        .message:hover {
-            transform: scale(1.02);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        .static-message-line:empty::after {
+            content: '';
+            display: block;
+            height: 20px;
         }
     </style>
 </head>
@@ -645,8 +643,9 @@
         </div>
         
         <div class="controls">
-            <div class="control-group">
-                <label for="playerCount">Number of Players:</label>
+            <div id="messageArea" class="static-message-line"></div>
+            
+            <div class="button-row">
                 <select id="playerCount">
                     <option value="2">2 Players</option>
                     <option value="3">3 Players</option>
@@ -657,13 +656,13 @@
                     <option value="8">8 Players</option>
                     <option value="9">9 Players</option>
                 </select>
+                
+                <button id="dealBtn" onclick="dealCards()">Deal Cards</button>
+                <button id="flopBtn" onclick="dealFlop()" disabled>Deal Flop</button>
+                <button id="turnBtn" onclick="dealTurn()" disabled>Deal Turn</button>
+                <button id="riverBtn" onclick="dealRiver()" disabled>Deal River</button>
+                <button id="resetBtn" onclick="resetGame()" style="background: #e74c3c;">Reset Game</button>
             </div>
-            
-            <button id="dealBtn" onclick="dealCards()">Deal Cards</button>
-            <button id="flopBtn" onclick="dealFlop()" disabled>Deal Flop</button>
-            <button id="turnBtn" onclick="dealTurn()" disabled>Deal Turn</button>
-            <button id="riverBtn" onclick="dealRiver()" disabled>Deal River</button>
-            <button id="resetBtn" onclick="resetGame()" style="background: #e74c3c;">Reset Game</button>
         </div>
         
         <div class="game-area">
@@ -673,9 +672,7 @@
             </div>
             
             <div id="playersGrid" class="players-grid"></div>
-            
-                    <div id="messageArea"></div>
-    </div>
+        </div>
     
     <!-- Fixed Explanation Overlay -->
     <div id="explanationOverlay" class="explanation-overlay">
@@ -2376,15 +2373,14 @@
         // Show message
         function showMessage(text, type) {
             const messageArea = document.getElementById('messageArea');
-            messageArea.innerHTML = `<div class="message ${type}" onmouseenter="pauseMessageTimer()" onmouseleave="resumeMessageTimer()">${text}</div>`;
+            messageArea.textContent = text;
             
             // Start the timer
             startMessageTimer();
         }
         
-        // Timer variables for message display
+        // Timer variable for message display
         let messageTimer = null;
-        let messageTimerPaused = false;
         
         // Start message timer
         function startMessageTimer() {
@@ -2392,26 +2388,13 @@
                 clearTimeout(messageTimer);
             }
             messageTimer = setTimeout(() => {
-                if (!messageTimerPaused) {
-                    document.getElementById('messageArea').innerHTML = '';
-                }
+                document.getElementById('messageArea').textContent = '';
             }, 8000);
         }
         
-        // Pause message timer when hovering
-        function pauseMessageTimer() {
-            messageTimerPaused = true;
-        }
-        
-        // Resume message timer when leaving
-        function resumeMessageTimer() {
-            messageTimerPaused = false;
-            // Give user a moment to read, then start timer again
-            setTimeout(() => {
-                if (!messageTimerPaused) {
-                    startMessageTimer();
-                }
-            }, 1000);
+        // Clear message
+        function clearMessage() {
+            document.getElementById('messageArea').textContent = '';
         }
         
         // Event listeners

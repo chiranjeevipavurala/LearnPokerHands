@@ -876,41 +876,69 @@
             
 
             
-            // Normalize probabilities to sum to 100%
-            const total = gameState.players.reduce((sum, p) => sum + p.probability, 0);
-            if (total > 0) {
-                // For river stage, create more dramatic differences when one player has a clearly better hand
-                if (gameState.currentStage === 'river') {
-                    const maxProb = Math.max(...gameState.players.map(p => p.probability));
-                    const minProb = Math.min(...gameState.players.map(p => p.probability));
-                    
-                    // If there's a significant difference in hand strength, make it more dramatic
-                    if (maxProb - minProb > 1) {
-                        // Give the strongest hand a much higher probability
-                        for (let player of gameState.players) {
-                            if (player.probability === maxProb) {
-                                player.probability = 90; // Strong hand gets 90%
-                            } else {
-                                player.probability = Math.round((10 / (gameState.players.length - 1))); // Others share 10%
-                            }
-                        }
-                    } else {
-                        // Normal normalization for close hands
-                        for (let player of gameState.players) {
-                            player.probability = Math.round((player.probability / total) * 100);
+            // For river stage, use actual hand strength to determine clear winner
+            if (gameState.currentStage === 'river') {
+                // Find the best hand score
+                const handScores = gameState.players.map(player => {
+                    const allCards = [...player.holeCards, ...gameState.communityCards];
+                    const handRank = getHandRankAtStage(allCards, gameState.currentStage);
+                    return { player, score: handRank.score, handType: handRank.name };
+                });
+                
+                // Sort by score (highest first)
+                handScores.sort((a, b) => b.score - a.score);
+                
+                // Check if there's a clear winner or tie
+                const bestScore = handScores[0].score;
+                const tiedPlayers = handScores.filter(h => h.score === bestScore);
+                
+                if (tiedPlayers.length === 1) {
+                    // Clear winner - give them 95%, others share 5%
+                    for (let player of gameState.players) {
+                        if (player === tiedPlayers[0].player) {
+                            player.probability = 95;
+                        } else {
+                            player.probability = Math.round(5 / (gameState.players.length - 1));
                         }
                     }
                 } else {
-                    // Normal normalization for other stages
-                    for (let player of gameState.players) {
-                        player.probability = Math.round((player.probability / total) * 100);
+                    // Potential tie - use tie-breaking logic to find actual winner(s)
+                    const winners = findWinners();
+                    
+                    if (winners.length === 1) {
+                        // Tie-breaking resolved to single winner
+                        for (let player of gameState.players) {
+                            if (player === winners[0].player) {
+                                player.probability = 95;
+                            } else {
+                                player.probability = Math.round(5 / (gameState.players.length - 1));
+                            }
+                        }
+                    } else {
+                        // True tie - distribute evenly among winners
+                        const tieProb = Math.round(100 / winners.length);
+                        for (let player of gameState.players) {
+                            if (winners.some(w => w.player === player)) {
+                                player.probability = tieProb;
+                            } else {
+                                player.probability = 0;
+                            }
+                        }
                     }
                 }
             } else {
-                // If all probabilities are 0, distribute evenly
-                const equalProb = Math.round(100 / gameState.players.length);
-                for (let player of gameState.players) {
-                    player.probability = equalProb;
+                // For other stages, use normal normalization
+                const total = gameState.players.reduce((sum, p) => sum + p.probability, 0);
+                if (total > 0) {
+                    for (let player of gameState.players) {
+                        player.probability = Math.round((player.probability / total) * 100);
+                    }
+                } else {
+                    // If all probabilities are 0, distribute evenly
+                    const equalProb = Math.round(100 / gameState.players.length);
+                    for (let player of gameState.players) {
+                        player.probability = equalProb;
+                    }
                 }
             }
             
@@ -1216,9 +1244,19 @@
             
             console.log('Winners before tie-breaking:', winners);
             
-            // If there are ties, break them with kickers
+            // If there are ties, try to break them with kickers
             if (winners.length > 1) {
+                console.log('Attempting to break ties...');
+                const winnersBeforeTieBreak = [...winners];
                 winners = breakTies(winners);
+                console.log('Winners after tie-breaking:', winners);
+                
+                // If tie-breaking didn't resolve the tie, keep the original winners
+                if (winners.length === 1 && winnersBeforeTieBreak.length > 1) {
+                    console.log('Tie-breaking resolved to single winner');
+                } else if (winners.length > 1) {
+                    console.log('Tie-breaking still shows multiple winners - true tie detected');
+                }
             }
             
             console.log('Final winners:', winners);
@@ -1323,13 +1361,227 @@
                 .map(card => card.value);
         }
         
-        // Placeholder functions for other tie-breaking scenarios
-        function breakTwoPairTie(winners) { return [winners[0]]; }
-        function breakThreeOfAKindTie(winners) { return [winners[0]]; }
-        function breakStraightTie(winners) { return [winners[0]]; }
-        function breakFlushTie(winners) { return [winners[0]]; }
-        function breakFullHouseTie(winners) { return [winners[0]]; }
-        function breakFourOfAKindTie(winners) { return [winners[0]]; }
+        // Helper function to break Four of a Kind ties
+        function breakFourOfAKindTie(winners) {
+            // For Four of a Kind, compare the kicker (5th card)
+            winners.sort((a, b) => {
+                const aKicker = getFourOfAKindKicker([...a.holeCards, ...gameState.communityCards]);
+                const bKicker = getFourOfAKindKicker([...b.holeCards, ...gameState.communityCards]);
+                return bKicker - aKicker; // Higher kicker wins
+            });
+            return [winners[0]];
+        }
+        
+        // Helper function to get the kicker for Four of a Kind
+        function getFourOfAKindKicker(cards) {
+            const counts = {};
+            for (let card of cards) {
+                counts[card.value] = (counts[card.value] || 0) + 1;
+            }
+            // Find the value that appears 4 times (the four of a kind)
+            let fourValue = 0;
+            for (let [value, count] of Object.entries(counts)) {
+                if (count === 4) {
+                    fourValue = parseInt(value);
+                    break;
+                }
+            }
+            // Return the kicker (the card that's not part of the four of a kind)
+            for (let card of cards) {
+                if (card.value !== fourValue) {
+                    return card.value;
+                }
+            }
+            return 0;
+        }
+        
+        // Helper function to break Three of a Kind ties
+        function breakThreeOfAKindTie(winners) {
+            // For Three of a Kind, compare the three-of-a-kind value first, then kickers
+            winners.sort((a, b) => {
+                const aThreeValue = getThreeOfAKindValue([...a.holeCards, ...gameState.communityCards]);
+                const bThreeValue = getThreeOfAKindValue([...b.holeCards, ...gameState.communityCards]);
+                
+                if (aThreeValue !== bThreeValue) {
+                    return bThreeValue - aThreeValue; // Higher three-of-a-kind wins
+                }
+                
+                // Same three-of-a-kind, compare kickers
+                const aKickers = getThreeOfAKindKickers([...a.holeCards, ...gameState.communityCards], aThreeValue);
+                const bKickers = getThreeOfAKindKickers([...b.holeCards, ...gameState.communityCards], bThreeValue);
+                
+                for (let i = 0; i < 2; i++) {
+                    if (aKickers[i] !== bKickers[i]) {
+                        return bKickers[i] - aKickers[i];
+                    }
+                }
+                return 0;
+            });
+            return [winners[0]];
+        }
+        
+        // Helper function to get the three-of-a-kind value
+        function getThreeOfAKindValue(cards) {
+            const counts = {};
+            for (let card of cards) {
+                counts[card.value] = (counts[card.value] || 0) + 1;
+            }
+            for (let [value, count] of Object.entries(counts)) {
+                if (count === 3) return parseInt(value);
+            }
+            return 0;
+        }
+        
+        // Helper function to get kickers for Three of a Kind
+        function getThreeOfAKindKickers(cards, threeValue) {
+            return cards
+                .filter(card => card.value !== threeValue)
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 2)
+                .map(card => card.value);
+        }
+        
+        // Helper function to break Full House ties
+        function breakFullHouseTie(winners) {
+            // For Full House, compare three-of-a-kind value first, then pair value
+            winners.sort((a, b) => {
+                const aFullHouse = getFullHouseValues([...a.holeCards, ...gameState.communityCards]);
+                const bFullHouse = getFullHouseValues([...b.holeCards, ...gameState.communityCards]);
+                
+                // Compare three-of-a-kind values
+                if (aFullHouse.threeValue !== bFullHouse.threeValue) {
+                    return bFullHouse.threeValue - aFullHouse.threeValue;
+                }
+                
+                // Same three-of-a-kind, compare pair values
+                return bFullHouse.pairValue - aFullHouse.pairValue;
+            });
+            return [winners[0]];
+        }
+        
+        // Helper function to get Full House values
+        function getFullHouseValues(cards) {
+            const counts = {};
+            for (let card of cards) {
+                counts[card.value] = (counts[card.value] || 0) + 1;
+            }
+            
+            let threeValue = 0;
+            let pairValue = 0;
+            
+            for (let [value, count] of Object.entries(counts)) {
+                if (count === 3) {
+                    threeValue = parseInt(value);
+                } else if (count === 2) {
+                    pairValue = parseInt(value);
+                }
+            }
+            
+            return { threeValue, pairValue };
+        }
+        
+        // Helper function to break Two Pair ties
+        function breakTwoPairTie(winners) {
+            // For Two Pair, compare higher pair, then lower pair, then kicker
+            winners.sort((a, b) => {
+                const aTwoPair = getTwoPairValues([...a.holeCards, ...gameState.communityCards]);
+                const bTwoPair = getTwoPairValues([...b.holeCards, ...gameState.communityCards]);
+                
+                // Compare higher pair
+                if (aTwoPair.higherPair !== bTwoPair.higherPair) {
+                    return bTwoPair.higherPair - aTwoPair.higherPair;
+                }
+                
+                // Same higher pair, compare lower pair
+                if (aTwoPair.lowerPair !== bTwoPair.lowerPair) {
+                    return bTwoPair.lowerPair - aTwoPair.lowerPair;
+                }
+                
+                // Same pairs, compare kicker
+                return bTwoPair.kicker - aTwoPair.kicker;
+            });
+            return [winners[0]];
+        }
+        
+        // Helper function to get Two Pair values
+        function getTwoPairValues(cards) {
+            const counts = {};
+            for (let card of cards) {
+                counts[card.value] = (counts[card.value] || 0) + 1;
+            }
+            
+            const pairs = [];
+            let kicker = 0;
+            
+            for (let [value, count] of Object.entries(counts)) {
+                if (count === 2) {
+                    pairs.push(parseInt(value));
+                } else if (count === 1) {
+                    kicker = Math.max(kicker, parseInt(value));
+                }
+            }
+            
+            pairs.sort((a, b) => b - a); // Sort pairs in descending order
+            
+            return {
+                higherPair: pairs[0] || 0,
+                lowerPair: pairs[1] || 0,
+                kicker: kicker
+            };
+        }
+        
+        // Helper function to break Straight ties
+        function breakStraightTie(winners) {
+            // For Straight, compare the highest card in the straight
+            winners.sort((a, b) => {
+                const aStraight = findHighestStraight([...a.holeCards, ...gameState.communityCards]);
+                const bStraight = findHighestStraight([...b.holeCards, ...gameState.communityCards]);
+                
+                if (aStraight.length > 0 && bStraight.length > 0) {
+                    return bStraight[0].value - aStraight[0].value;
+                }
+                return 0;
+            });
+            return [winners[0]];
+        }
+        
+        // Helper function to break Flush ties
+        function breakFlushTie(winners) {
+            // For Flush, compare the highest card in the flush
+            winners.sort((a, b) => {
+                const aFlush = getFlushCards([...a.holeCards, ...gameState.communityCards]);
+                const bFlush = getFlushCards([...b.holeCards, ...gameState.communityCards]);
+                
+                if (aFlush.length > 0 && bFlush.length > 0) {
+                    // Compare all 5 cards in descending order
+                    for (let i = 0; i < 5; i++) {
+                        if (aFlush[i].value !== bFlush[i].value) {
+                            return bFlush[i].value - aFlush[i].value;
+                        }
+                    }
+                }
+                return 0;
+            });
+            return [winners[0]];
+        }
+        
+        // Helper function to get Flush cards
+        function getFlushCards(cards) {
+            const suits = {};
+            for (let card of cards) {
+                if (!suits[card.suit]) suits[card.suit] = [];
+                suits[card.suit].push(card);
+            }
+            
+            for (let suit in suits) {
+                if (suits[suit].length >= 5) {
+                    return suits[suit]
+                        .sort((a, b) => b.value - a.value)
+                        .slice(0, 5);
+                }
+            }
+            return [];
+        }
         
         // Function to show explanation overlay
         function showExplanationOverlay(content) {
@@ -1387,6 +1639,60 @@
                 console.log('Content innerHTML length:', contentDiv.innerHTML.length);
             }
             console.log('====================');
+        };
+        
+        // Debug function to print current game state
+        window.debugGameState = function() {
+            console.log('=== GAME STATE DEBUG ===');
+            console.log('Current Stage:', gameState.currentStage);
+            console.log('Community Cards:', gameState.communityCards.map(card => `${card.rank}${card.suit}`).join(', '));
+            console.log('Players:');
+            gameState.players.forEach((player, index) => {
+                console.log(`  Player ${index + 1} (${player.name}):`);
+                console.log(`    Hole Cards: ${player.holeCards.map(card => `${card.rank}${card.suit}`).join(', ')}`);
+                console.log(`    Win Probability: ${player.probability}%`);
+                if (player.holeCards.length > 0) {
+                    const allCards = [...player.holeCards, ...gameState.communityCards];
+                    const handRank = getHandRankAtStage(allCards, gameState.currentStage);
+                    console.log(`    Hand: ${handRank.name}`);
+                }
+            });
+            console.log('====================');
+        };
+        
+        // Debug function to print detailed hand analysis
+        window.debugHandAnalysis = function() {
+            console.log('=== DETAILED HAND ANALYSIS ===');
+            gameState.players.forEach((player, index) => {
+                if (player.holeCards.length > 0) {
+                    console.log(`\nPlayer ${index + 1} (${player.name}):`);
+                    const allCards = [...player.holeCards, ...gameState.communityCards];
+                    console.log(`  All Cards: ${allCards.map(card => `${card.rank}${card.suit}`).join(', ')}`);
+                    
+                    const handRank = getHandRankAtStage(allCards, gameState.currentStage);
+                    console.log(`  Hand Type: ${handRank.name}`);
+                    console.log(`  Hand Score: ${handRank.score}`);
+                    
+                    // Show best 5-card combination
+                    if (allCards.length >= 5) {
+                        const bestHand = findBestFiveCardHand(allCards);
+                        console.log(`  Best 5-Card Hand: ${bestHand.name} (Score: ${bestHand.score})`);
+                    }
+                }
+            });
+            console.log('============================');
+        };
+        
+        // Test function to manually trigger overlay
+        window.testOverlay = function() {
+            console.log('Testing overlay manually...');
+            const testContent = '<h3>🧪 Test Overlay</h3><div class="hand-explanation">This is a test overlay to verify functionality.</div>';
+            try {
+                showExplanationOverlay(testContent);
+                console.log('Test overlay should be visible now');
+            } catch (error) {
+                console.error('Error showing test overlay:', error);
+            }
         };
         
         // Close overlay when clicking outside
@@ -1742,6 +2048,10 @@
         
         // Helper function to find the highest straight
         function findHighestStraight(cards) {
+            if (!cards || cards.length < 5) {
+                return [];
+            }
+            
             const sorted = cards.sort((a, b) => b.value - a.value);
             
             // Check for 5 consecutive cards starting from the highest
@@ -1868,6 +2178,12 @@
         
         // Helper function to get card name
         function getCardName(card) {
+            // Add error checking
+            if (!card || typeof card.value === 'undefined') {
+                console.error('getCardName called with invalid card:', card);
+                return 'Unknown';
+            }
+            
             switch (card.value) {
                 case 14: return 'Ace';
                 case 13: return 'King';
@@ -1988,18 +2304,39 @@
         
         // Select winner
         function selectWinner(playerId) {
+            console.log('=== SELECT WINNER DEBUG ===');
             console.log('selectWinner called with playerId:', playerId);
+            console.log('Current gameState:', gameState);
+            
             gameState.selectedWinner = playerId;
+            console.log('Set selectedWinner to:', gameState.selectedWinner);
             
             // Update button states
-            document.querySelectorAll('.winner-btn').forEach(btn => {
+            const allButtons = document.querySelectorAll('.winner-btn');
+            console.log('Found winner buttons:', allButtons.length);
+            
+            allButtons.forEach(btn => {
                 btn.classList.remove('selected');
             });
-            document.querySelector(`[data-player="${playerId}"]`).classList.add('selected');
+            
+            const selectedButton = document.querySelector(`[data-player="${playerId}"]`);
+            console.log('Selected button element:', selectedButton);
+            if (selectedButton) {
+                selectedButton.classList.add('selected');
+                console.log('Added selected class to button');
+            } else {
+                console.error('Could not find button with data-player:', playerId);
+            }
             
             // Automatically evaluate the winner after selection
             console.log('Calling evaluateWinner...');
-            evaluateWinner();
+            try {
+                evaluateWinner();
+                console.log('evaluateWinner called successfully');
+            } catch (error) {
+                console.error('Error calling evaluateWinner:', error);
+            }
+            console.log('=== END SELECT WINNER DEBUG ===');
         }
         
         // Evaluate winner
@@ -2029,16 +2366,25 @@
             let isTie = winners.length > 1;
             
             if (isTie) {
-                // Handle ties - same message regardless of selection
+                // Handle ties - user selected one of the tied players
                 const winnerNames = winners.map(w => w.name).join(', ');
-                mainMessage = `There was a tie between ${winnerNames} with ${getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage).name}.`;
+                const selectedPlayerName = selectedPlayer.name;
+                const isSelectedPlayerInTie = winners.some(w => w.id === gameState.selectedWinner);
+                
+                if (isSelectedPlayerInTie) {
+                    // User correctly selected one of the tied players
+                    mainMessage = `🎯 You correctly identified that ${selectedPlayerName} is one of the winners! This is a split between ${winnerNames} with ${getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage).name}.`;
+                } else {
+                    // User selected someone not in the tie
+                    mainMessage = `❌ ${selectedPlayerName} didn't win. This is a split between ${winnerNames} with ${getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage).name}.`;
+                }
             } else if (isCorrect) {
                 // Single winner, user predicted correctly
-                mainMessage = `You correctly predicted that ${selectedPlayer.name} would win!`;
+                mainMessage = `🎉 You correctly predicted that ${selectedPlayer.name} would win!`;
             } else {
                 // Single winner, user predicted incorrectly
                 const actualPlayer = winners[0];
-                mainMessage = `${actualPlayer.name} actually won with a ${getHandRankAtStage([...actualPlayer.holeCards, ...gameState.communityCards], gameState.currentStage).name}.`;
+                mainMessage = `❌ ${actualPlayer.name} actually won with a ${getHandRankAtStage([...actualPlayer.holeCards, ...gameState.communityCards], gameState.currentStage).name}.`;
             }
             
             // Get hand information for explanations
@@ -2128,9 +2474,19 @@
                 }
             } else {
                 // For ties, explain why they tied
+                console.log('=== TIE SCENARIO DEBUG ===');
                 console.log('Getting tie explanation for winners:', winners);
-                detailedExplanation = getTieExplanation(winners);
-                console.log('Tie explanation result:', detailedExplanation);
+                console.log('Winners array length:', winners.length);
+                console.log('Winners details:', winners);
+                
+                try {
+                    detailedExplanation = getTieExplanation(winners);
+                    console.log('Tie explanation result:', detailedExplanation);
+                } catch (error) {
+                    console.error('Error getting tie explanation:', error);
+                    detailedExplanation = `TIE: ${winners.map(w => w.name).join(', ')} have tied.`;
+                }
+                console.log('=== END TIE SCENARIO DEBUG ===');
             }
             
             // Build all player hands summary
@@ -2155,20 +2511,40 @@
                     handDescription += ` (${getCardName({ value: pairValues[0], suit: '♠' })}s and ${getCardName({ value: pairValues[1], suit: '♠' })}s)`;
                 } else if (handRank.name === 'Three of a Kind') {
                     const counts = getCardCounts([...player.holeCards, ...gameState.communityCards]);
-                    const threeValue = Object.entries(counts).find(([value, count]) => count === 3)[0];
-                    handDescription += ` (${getCardName({ value: parseInt(threeValue), suit: '♠' })}s)`;
+                    const threeValueEntry = Object.entries(counts).find(([value, count]) => count === 3);
+                    if (threeValueEntry) {
+                        const threeValue = threeValueEntry[0];
+                        handDescription += ` (${getCardName({ value: parseInt(threeValue), suit: '♠' })}s)`;
+                    } else {
+                        handDescription += ` (Three of a Kind)`;
+                    }
                 } else if (handRank.name === 'Full House') {
                     const counts = getCardCounts([...player.holeCards, ...gameState.communityCards]);
-                    const threeVal = Object.entries(counts).find(([value, count]) => count === 3)[0];
-                    const twoVal = Object.entries(counts).find(([value, count]) => count === 2)[0];
-                    handDescription += ` (${getCardName({ value: parseInt(threeVal), suit: '♠' })}s full of ${getCardName({ value: parseInt(twoVal), suit: '♠' })}s)`;
+                    const threeValEntry = Object.entries(counts).find(([value, count]) => count === 3);
+                    const twoValEntry = Object.entries(counts).find(([value, count]) => count === 2);
+                    if (threeValEntry && twoValEntry) {
+                        const threeVal = threeValEntry[0];
+                        const twoVal = twoValEntry[0];
+                        handDescription += ` (${getCardName({ value: parseInt(threeVal), suit: '♠' })}s full of ${getCardName({ value: parseInt(twoVal), suit: '♠' })}s)`;
+                    } else {
+                        handDescription += ` (Full House)`;
+                    }
                 } else if (handRank.name === 'Four of a Kind') {
                     const counts = getCardCounts([...player.holeCards, ...gameState.communityCards]);
-                    const fourValue = Object.entries(counts).find(([value, count]) => count === 4)[0];
-                    handDescription += ` (${getCardName({ value: parseInt(fourValue), suit: '♠' })}s)`;
+                    const fourValueEntry = Object.entries(counts).find(([value, count]) => count === 4);
+                    if (fourValueEntry) {
+                        const fourValue = fourValueEntry[0];
+                        handDescription += ` (${getCardName({ value: parseInt(fourValue), suit: '♠' })}s)`;
+                    } else {
+                        handDescription += ` (Four of a Kind)`;
+                    }
                 } else if (handRank.name === 'Straight') {
                     const straight = findHighestStraight([...player.holeCards, ...gameState.communityCards]);
-                    handDescription += ` (${getCardName(straight[0])} high)`;
+                    if (straight && straight.length > 0) {
+                        handDescription += ` (${getCardName(straight[0])} high)`;
+                    } else {
+                        handDescription += ` (Straight)`;
+                    }
                 } else if (handRank.name === 'Flush') {
                     const suits = {};
                     for (let card of [...player.holeCards, ...gameState.communityCards]) {
@@ -2183,7 +2559,7 @@
             
             // Show everything in the unified overlay
             const overlayContent = `
-                <h3>${isTie ? '🤝 It\'s a Tie!' : (isCorrect ? '🎉 Congratulations!' : '❌ Not Right!')}</h3>
+                <h3>${isTie ? (winners.some(w => w.id === gameState.selectedWinner) ? '🎯 Split Detected!' : '🤝 It\'s a Split!') : (isCorrect ? '🎉 Congratulations!' : '❌ Not Right!')}</h3>
                 <div class="hand-explanation" style="background: ${isTie ? 'rgba(255, 165, 0, 0.2)' : (isCorrect ? 'rgba(39, 174, 96, 0.2)' : 'rgba(231, 76, 60, 0.2)')}; border: 2px solid ${isTie ? 'rgba(255, 165, 0, 0.5)' : (isCorrect ? 'rgba(39, 174, 96, 0.5)' : 'rgba(231, 76, 60, 0.5)')};">
                     ${mainMessage}
                 </div>
@@ -2197,7 +2573,20 @@
                     ${allPlayerHands}
                 </div>
             `;
-            showExplanationOverlay(overlayContent);
+            
+            console.log('About to show overlay with content:', overlayContent);
+            console.log('isTie:', isTie, 'isCorrect:', isCorrect);
+            console.log('Calling showExplanationOverlay...');
+            
+            try {
+                showExplanationOverlay(overlayContent);
+                console.log('showExplanationOverlay called successfully');
+            } catch (error) {
+                console.error('Error calling showExplanationOverlay:', error);
+                // Fallback: show message in the message area
+                console.log('Falling back to message display');
+                showMessage(`Result: ${mainMessage}`, 'info');
+            }
             
             // Reset selection
             gameState.selectedWinner = null;

@@ -2082,8 +2082,49 @@
             let detailedExplanation = '';
             if (winners.length === 1) {
                 if (isCorrect) {
-                    // User correctly predicted the winner - explain why they won
-                    detailedExplanation = `🎯 ${selectedPlayer.name} won with ${getHandRankAtStage([...selectedPlayer.holeCards, ...gameState.communityCards], gameState.currentStage).name}!`;
+                    // User correctly predicted the winner - explain why they won in detail
+                    const winnerHand = getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage);
+                    const otherPlayers = gameState.players.filter(p => p.id !== winners[0].id);
+                    
+                    // Build detailed explanation of why the winner won
+                    let winReasons = [];
+                    
+                    // Compare with each other player
+                    for (let otherPlayer of otherPlayers) {
+                        const otherHand = getHandRankAtStage([...otherPlayer.holeCards, ...gameState.communityCards], gameState.currentStage);
+                        
+                        if (winnerHand.name !== otherHand.name) {
+                            // Different hand types - explain the ranking
+                            winReasons.push(`${winners[0].name}'s ${winnerHand.name} beats ${otherPlayer.name}'s ${otherHand.name} because ${winnerHand.name} ranks higher than ${otherHand.name} in poker hand rankings.`);
+                        } else {
+                            // Same hand type - explain why one is better
+                            if (winnerHand.name === 'High Card') {
+                                winReasons.push(getHighCardComparison(otherPlayer, winners[0]));
+                            } else if (winnerHand.name === 'One Pair') {
+                                winReasons.push(getOnePairComparison(otherPlayer, winners[0]));
+                            } else if (winnerHand.name === 'Two Pair') {
+                                winReasons.push(getTwoPairComparison(otherPlayer, winners[0]));
+                            } else if (winnerHand.name === 'Three of a Kind') {
+                                winReasons.push(getThreeOfAKindComparison(otherPlayer, winners[0]));
+                            } else if (winnerHand.name === 'Straight') {
+                                winReasons.push(getStraightComparison(otherPlayer, winners[0]));
+                            } else if (winnerHand.name === 'Flush') {
+                                winReasons.push(getFlushComparison(otherPlayer, winners[0]));
+                            } else if (winnerHand.name === 'Full House') {
+                                winReasons.push(getFullHouseComparison(otherPlayer, winners[0]));
+                            } else if (winnerHand.name === 'Four of a Kind') {
+                                winReasons.push(getFourOfAKindComparison(otherPlayer, winners[0]));
+                            } else if (winnerHand.name === 'Straight Flush') {
+                                winReasons.push(getStraightFlushComparison(otherPlayer, winners[0]));
+                            } else if (winnerHand.name === 'Royal Flush') {
+                                winReasons.push(getRoyalFlushComparison(otherPlayer, winners[0]));
+                            } else {
+                                winReasons.push(`Both players have ${winnerHand.name}, but ${winners[0].name} has a stronger version.`);
+                            }
+                        }
+                    }
+                    
+                    detailedExplanation = `🎯 ${winners[0].name} won with ${winnerHand.name}! Here's why:\n\n${winReasons.join('\n\n')}`;
                 } else {
                     // User incorrectly predicted - explain why the selected player lost
                     detailedExplanation = getDetailedWinExplanation(selectedPlayer, winners[0]);

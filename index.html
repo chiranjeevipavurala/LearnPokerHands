@@ -907,21 +907,21 @@
                     
                     if (winners.length === 1) {
                         // Tie-breaking resolved to single winner
-                        for (let player of gameState.players) {
-                            if (player === winners[0].player) {
-                                player.probability = 95;
+                        for (let i = 0; i < gameState.players.length; i++) {
+                            if (i === winners[0].id) {
+                                gameState.players[i].probability = 95;
                             } else {
-                                player.probability = Math.round(5 / (gameState.players.length - 1));
+                                gameState.players[i].probability = Math.round(5 / (gameState.players.length - 1));
                             }
                         }
                     } else {
                         // True tie - distribute evenly among winners
                         const tieProb = Math.round(100 / winners.length);
-                        for (let player of gameState.players) {
-                            if (winners.some(w => w.player === player)) {
-                                player.probability = tieProb;
+                        for (let i = 0; i < gameState.players.length; i++) {
+                            if (winners.some(w => w.id === i)) {
+                                gameState.players[i].probability = tieProb;
                             } else {
-                                player.probability = 0;
+                                gameState.players[i].probability = 0;
                             }
                         }
                     }
@@ -1310,7 +1310,25 @@
                 return 0; // Complete tie
             });
             
-            // Return only the highest (first after sorting)
+            // Check if there's a true tie (all 5 cards are the same)
+            if (winners.length > 1) {
+                const firstCards = [...winners[0].holeCards, ...gameState.communityCards].sort((x, y) => y.value - x.value).slice(0, 5);
+                const secondCards = [...winners[1].holeCards, ...gameState.communityCards].sort((x, y) => y.value - x.value).slice(0, 5);
+                
+                let isTrueTie = true;
+                for (let i = 0; i < 5; i++) {
+                    if (firstCards[i].value !== secondCards[i].value) {
+                        isTrueTie = false;
+                        break;
+                    }
+                }
+                
+                if (isTrueTie) {
+                    // True tie - return all winners
+                    return winners;
+                }
+            }
+            
             return [winners[0]];
         }
         
@@ -1336,6 +1354,22 @@
                 }
                 return 0;
             });
+            
+            // Check if there's a true tie (same pair and all kickers)
+            if (winners.length > 1) {
+                const firstPair = findPairValue([...winners[0].holeCards, ...gameState.communityCards]);
+                const secondPair = findPairValue([...winners[1].holeCards, ...gameState.communityCards]);
+                const firstKickers = getKickers([...winners[0].holeCards, ...gameState.communityCards], firstPair);
+                const secondKickers = getKickers([...winners[1].holeCards, ...gameState.communityCards], secondPair);
+                
+                if (firstPair === secondPair && 
+                    firstKickers[0] === secondKickers[0] &&
+                    firstKickers[1] === secondKickers[1] &&
+                    firstKickers[2] === secondKickers[2]) {
+                    // True tie - return all winners
+                    return winners;
+                }
+            }
             
             return [winners[0]];
         }
@@ -1369,6 +1403,18 @@
                 const bKicker = getFourOfAKindKicker([...b.holeCards, ...gameState.communityCards]);
                 return bKicker - aKicker; // Higher kicker wins
             });
+            
+            // Check if there's a true tie (same kicker)
+            if (winners.length > 1) {
+                const firstKicker = getFourOfAKindKicker([...winners[0].holeCards, ...gameState.communityCards]);
+                const secondKicker = getFourOfAKindKicker([...winners[1].holeCards, ...gameState.communityCards]);
+                
+                if (firstKicker === secondKicker) {
+                    // True tie - return all winners
+                    return winners;
+                }
+            }
+            
             return [winners[0]];
         }
         
@@ -1417,6 +1463,22 @@
                 }
                 return 0;
             });
+            
+            // Check if there's a true tie (same three-of-a-kind and kickers)
+            if (winners.length > 1) {
+                const firstThreeValue = getThreeOfAKindValue([...winners[0].holeCards, ...gameState.communityCards]);
+                const secondThreeValue = getThreeOfAKindValue([...winners[1].holeCards, ...gameState.communityCards]);
+                const firstKickers = getThreeOfAKindKickers([...winners[0].holeCards, ...gameState.communityCards], firstThreeValue);
+                const secondKickers = getThreeOfAKindKickers([...winners[1].holeCards, ...gameState.communityCards], secondThreeValue);
+                
+                if (firstThreeValue === secondThreeValue &&
+                    firstKickers[0] === secondKickers[0] &&
+                    firstKickers[1] === secondKickers[1]) {
+                    // True tie - return all winners
+                    return winners;
+                }
+            }
+            
             return [winners[0]];
         }
         
@@ -1456,6 +1518,19 @@
                 // Same three-of-a-kind, compare pair values
                 return bFullHouse.pairValue - aFullHouse.pairValue;
             });
+            
+            // Check if there's a true tie (same three-of-a-kind and pair)
+            if (winners.length > 1) {
+                const firstFullHouse = getFullHouseValues([...winners[0].holeCards, ...gameState.communityCards]);
+                const secondFullHouse = getFullHouseValues([...winners[1].holeCards, ...gameState.communityCards]);
+                
+                if (firstFullHouse.threeValue === secondFullHouse.threeValue &&
+                    firstFullHouse.pairValue === secondFullHouse.pairValue) {
+                    // True tie - return all winners
+                    return winners;
+                }
+            }
+            
             return [winners[0]];
         }
         
@@ -1500,6 +1575,20 @@
                 // Same pairs, compare kicker
                 return bTwoPair.kicker - aTwoPair.kicker;
             });
+            
+            // Check if there's a true tie (same higher pair, lower pair, and kicker)
+            if (winners.length > 1) {
+                const firstTwoPair = getTwoPairValues([...winners[0].holeCards, ...gameState.communityCards]);
+                const secondTwoPair = getTwoPairValues([...winners[1].holeCards, ...gameState.communityCards]);
+                
+                if (firstTwoPair.higherPair === secondTwoPair.higherPair &&
+                    firstTwoPair.lowerPair === secondTwoPair.lowerPair &&
+                    firstTwoPair.kicker === secondTwoPair.kicker) {
+                    // True tie - return all winners
+                    return winners;
+                }
+            }
+            
             return [winners[0]];
         }
         
@@ -1542,6 +1631,19 @@
                 }
                 return 0;
             });
+            
+            // Check if there's a true tie (same highest card)
+            if (winners.length > 1) {
+                const firstStraight = findHighestStraight([...winners[0].holeCards, ...gameState.communityCards]);
+                const secondStraight = findHighestStraight([...winners[1].holeCards, ...gameState.communityCards]);
+                
+                if (firstStraight.length > 0 && secondStraight.length > 0 && 
+                    firstStraight[0].value === secondStraight[0].value) {
+                    // True tie - return all winners
+                    return winners;
+                }
+            }
+            
             return [winners[0]];
         }
         
@@ -1562,6 +1664,28 @@
                 }
                 return 0;
             });
+            
+            // Check if there's a true tie (all 5 flush cards are the same)
+            if (winners.length > 1) {
+                const firstFlush = getFlushCards([...winners[0].holeCards, ...gameState.communityCards]);
+                const secondFlush = getFlushCards([...winners[1].holeCards, ...gameState.communityCards]);
+                
+                if (firstFlush.length > 0 && secondFlush.length > 0) {
+                    let isTrueTie = true;
+                    for (let i = 0; i < 5; i++) {
+                        if (firstFlush[i].value !== secondFlush[i].value) {
+                            isTrueTie = false;
+                            break;
+                        }
+                    }
+                    
+                    if (isTrueTie) {
+                        // True tie - return all winners
+                        return winners;
+                    }
+                }
+            }
+            
             return [winners[0]];
         }
         
@@ -1680,6 +1804,47 @@
                     }
                 }
             });
+            console.log('============================');
+        };
+        
+        // Debug function to test tie-breaking logic
+        window.debugTieBreaking = function() {
+            console.log('=== TIE-BREAKING DEBUG ===');
+            const winners = findWinners();
+            console.log('Final winners from findWinners():', winners);
+            
+            // Test hand comparison directly
+            if (gameState.currentStage === 'river' && gameState.players.length >= 2) {
+                console.log('\nTesting Hand comparison:');
+                const player1AllCards = [...gameState.players[0].holeCards, ...gameState.communityCards];
+                const player2AllCards = [...gameState.players[1].holeCards, ...gameState.communityCards];
+                
+                const hand1 = getHandRankAtStage(player1AllCards, gameState.currentStage);
+                const hand2 = getHandRankAtStage(player2AllCards, gameState.currentStage);
+                
+                console.log(`Player 1: ${hand1.name} (Score: ${hand1.score})`);
+                console.log(`Player 2: ${hand2.name} (Score: ${hand2.score})`);
+                
+                if (hand1.name === hand2.name) {
+                    console.log('\nSame hand type - testing tie-breaking:');
+                    
+                    if (hand1.name === 'Two Pair') {
+                        const p1TwoPair = getTwoPairValues(player1AllCards);
+                        const p2TwoPair = getTwoPairValues(player2AllCards);
+                        
+                        console.log(`Player 1 Two Pair: ${p1TwoPair.higherPair}s and ${p1TwoPair.lowerPair}s with ${p1TwoPair.kicker} kicker`);
+                        console.log(`Player 2 Two Pair: ${p2TwoPair.higherPair}s and ${p2TwoPair.lowerPair}s with ${p2TwoPair.kicker} kicker`);
+                        
+                        if (p1TwoPair.higherPair !== p2TwoPair.higherPair) {
+                            console.log(`Higher pair comparison: ${Math.max(p1TwoPair.higherPair, p2TwoPair.higherPair)} > ${Math.min(p1TwoPair.higherPair, p2TwoPair.higherPair)}`);
+                        } else if (p1TwoPair.lowerPair !== p2TwoPair.lowerPair) {
+                            console.log(`Lower pair comparison: ${Math.max(p1TwoPair.lowerPair, p2TwoPair.lowerPair)} > ${Math.min(p1TwoPair.lowerPair, p2TwoPair.lowerPair)}`);
+                        } else {
+                            console.log(`Kicker comparison: ${Math.max(p1TwoPair.kicker, p2TwoPair.kicker)} > ${Math.min(p1TwoPair.kicker, p2TwoPair.kicker)}`);
+                        }
+                    }
+                }
+            }
             console.log('============================');
         };
         

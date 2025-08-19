@@ -697,6 +697,17 @@
         const suits = ['♠', '♥', '♦', '♣'];
         const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
         
+        // Add this function after your existing Google Analytics code
+        function trackEvent(eventName, eventCategory, eventLabel, eventValue) {
+            if (typeof gtag !== 'undefined') {
+                gtag('event', eventName, {
+                    event_category: eventCategory,
+                    event_label: eventLabel,
+                    value: eventValue
+                });
+            }
+        }
+        
         // Initialize game
         function initGame() {
             createDeck();
@@ -752,6 +763,9 @@
                 resetGame();
             }
             
+            // Track the deal cards event
+            trackEvent('deal_cards', 'game_action', 'initial_deal', gameState.players.length);
+            
             // Reset explanation overlay
             const overlay = document.getElementById('explanationOverlay');
             if (overlay) {
@@ -778,6 +792,9 @@
         // Deal flop
         function dealFlop() {
             if (gameState.currentStage !== 'dealt') return;
+            
+            // Track the flop event
+            trackEvent('deal_flop', 'game_action', 'flop_dealt', gameState.players.length);
             
             // Reset explanation overlay
             const overlay = document.getElementById('explanationOverlay');
@@ -807,6 +824,9 @@
         function dealTurn() {
             if (gameState.currentStage !== 'flop') return;
             
+            // Track the turn event
+            trackEvent('deal_turn', 'game_action', 'turn_dealt', gameState.players.length);
+            
             // Reset explanation overlay
             const overlay = document.getElementById('explanationOverlay');
             if (overlay) {
@@ -829,6 +849,9 @@
         // Deal river
         function dealRiver() {
             if (gameState.currentStage !== 'turn') return;
+            
+            // Track the river event
+            trackEvent('deal_river', 'game_action', 'river_dealt', gameState.players.length);
             
             // Reset explanation overlay
             const overlay = document.getElementById('explanationOverlay');
@@ -2469,6 +2492,9 @@
         
         // Select winner
         function selectWinner(playerId) {
+            // Track winner selection
+            trackEvent('select_winner', 'game_action', `player_${playerId + 1}`, gameState.currentStage);
+            
             console.log('=== SELECT WINNER DEBUG ===');
             console.log('selectWinner called with playerId:', playerId);
             console.log('Current gameState:', gameState);
@@ -2525,6 +2551,9 @@
             // Check if user's prediction was correct
             const isCorrect = winners.some(w => w.id === gameState.selectedWinner);
             console.log('Is correct prediction:', isCorrect);
+            
+            // Track evaluation
+            trackEvent('evaluate_winner', 'game_result', isCorrect ? 'correct' : 'incorrect', gameState.players.length);
             
             // Build the main message
             let mainMessage = '';
@@ -2762,6 +2791,9 @@
         
         // Reset game
         function resetGame() {
+            // Track game reset
+            trackEvent('reset_game', 'game_action', 'manual_reset', gameState.players.length);
+            
             gameState.communityCards = [];
             gameState.currentStage = 'preflop';
             gameState.selectedWinner = null;
@@ -2952,7 +2984,11 @@
         }
         
         // Event listeners
-        document.getElementById('playerCount').addEventListener('change', resetGame);
+        document.getElementById('playerCount').addEventListener('change', function() {
+            const newPlayerCount = this.value;
+            trackEvent('change_players', 'game_setup', `players_${newPlayerCount}`, parseInt(newPlayerCount));
+            resetGame();
+        });
         
         // Initialize game
         initGame();
@@ -2963,6 +2999,9 @@
             const button = document.getElementById('instructionsBtn');
             
             if (panel.style.display === 'none') {
+                // Track instructions opened
+                trackEvent('open_instructions', 'user_help', 'instructions_panel', 1);
+                
                 // Show instructions
                 panel.style.display = 'block';
                 setTimeout(() => {
@@ -2970,6 +3009,9 @@
                 }, 10);
                 button.textContent = '📖 Hide Instructions';
             } else {
+                // Track instructions closed
+                trackEvent('close_instructions', 'user_help', 'instructions_panel', 1);
+                
                 // Hide instructions
                 panel.classList.remove('show');
                 setTimeout(() => {

@@ -436,11 +436,16 @@
         }
         
         .probability {
-            font-size: 18px;
+            font-size: 15px;
             font-weight: bold;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             color: #2ecc71;
             text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        
+        .hand-status {
+            font-size: 12px;
+            padding: 5px 8px;
         }
         
         .winner-btn {
@@ -897,13 +902,13 @@
                     <ol>
                         <li><strong>Select Players:</strong> Choose 2-9 players using the dropdown</li>
                         <li><strong>Deal Cards:</strong> Click "Deal Cards" to give each player 2 hole cards</li>
-                        <li><strong>Evaluate Preflop:</strong> See win probabilities and select who you think will win</li>
+                        <li><strong>Review Pre-Flop:</strong> See hand categories (Premium, Strong, Medium, Weak) for each player</li>
                         <li><strong>Deal Flop:</strong> Click "Deal Flop" to reveal 3 community cards</li>
-                        <li><strong>Re-evaluate:</strong> Probabilities update - select your winner again</li>
+                        <li><strong>Review Flop:</strong> See current hands and drawing odds for each player</li>
                         <li><strong>Deal Turn:</strong> Click "Deal Turn" to reveal the 4th community card</li>
-                        <li><strong>Final Evaluation:</strong> Select winner based on 6 visible cards</li>
+                        <li><strong>Review Turn:</strong> See updated hands and drawing odds</li>
                         <li><strong>Deal River:</strong> Click "Deal River" to reveal the final community card</li>
-                        <li><strong>Final Winner:</strong> Select the ultimate winner with all 7 cards visible</li>
+                        <li><strong>Select Winner:</strong> Now select who you think will win and evaluate!</li>
                     </ol>
                     
                     <h4>🏆 Hand Rankings (Best to Worst)</h4>
@@ -923,8 +928,7 @@
                     <h4>💡 Learning Tips</h4>
                     <ul>
                         <li>Start with 2-3 players to learn the basics</li>
-                        <li>Pay attention to how probabilities change at each stage</li>
-                        <li>Use the tooltips on cards to see hand descriptions</li>
+                        <li>Pay attention to how hands improve at each stage</li>
                         <li>Learn from the detailed explanations after each prediction</li>
                         <li>Practice with different player counts to see various scenarios</li>
                     </ul>
@@ -1044,7 +1048,9 @@
                     name: `Player ${i + 1}`,
                     holeCards: [],
                     probability: 0,
-                    isWinner: false
+                    isWinner: false,
+                    handCategory: '',
+                    drawingOdds: ''
                 });
             }
         }
@@ -1078,12 +1084,19 @@
             updateDisplay();
             updateButtons();
             
-            showMessage('Cards dealt! Select who you think will win, then deal the flop.', 'info');
+            showMessage('Cards dealt! Review your hand categories, then deal the flop.', 'info');
         }
         
         // Deal flop
         function dealFlop() {
-            if (gameState.currentStage !== 'dealt') return;
+            console.log('dealFlop called, currentStage:', gameState.currentStage);
+            
+            if (gameState.currentStage !== 'dealt') {
+                console.log('dealFlop: wrong stage, expected "dealt", got:', gameState.currentStage);
+                return;
+            }
+            
+            console.log('dealFlop: proceeding with flop deal');
             
             // Track the flop event
             trackEvent('deal_flop', 'game_action', 'flop_dealt', gameState.players.length);
@@ -1104,12 +1117,34 @@
                 gameState.deck.pop()
             ];
             
-            gameState.currentStage = 'flop';
-            calculateProbabilities();
-            updateDisplay();
-            updateButtons();
+            console.log('dealFlop: community cards set:', gameState.communityCards);
             
-            showMessage('Flop dealt! Select who you think will win, then deal the turn.', 'info');
+            gameState.currentStage = 'flop';
+            console.log('dealFlop: stage set to flop');
+            
+            try {
+                calculateProbabilities();
+                console.log('dealFlop: probabilities calculated');
+            } catch (error) {
+                console.error('dealFlop: error in calculateProbabilities:', error);
+            }
+            
+            try {
+                updateDisplay();
+                console.log('dealFlop: display updated');
+            } catch (error) {
+                console.error('dealFlop: error in updateDisplay:', error);
+            }
+            
+            try {
+                updateButtons();
+                console.log('dealFlop: buttons updated');
+            } catch (error) {
+                console.error('dealFlop: error in updateButtons:', error);
+            }
+            
+            showMessage('Flop dealt! Review current hands and drawing odds, then deal the turn.', 'info');
+            console.log('dealFlop: completed successfully');
         }
         
         // Deal turn
@@ -1135,7 +1170,7 @@
             updateDisplay();
             updateButtons();
             
-            showMessage('Turn dealt! Select who you think will win, then deal the river.', 'info');
+            showMessage('Turn dealt! Review current hands and drawing odds, then deal the river.', 'info');
         }
         
         // Deal river
@@ -1161,216 +1196,106 @@
             updateDisplay();
             updateButtons();
             
-            showMessage('River dealt! Select who you think will win, then evaluate!', 'info');
+            showMessage('River dealt! Now select who you think will win, then evaluate!', 'info');
         }
         
         // Calculate winning probabilities
         function calculateProbabilities() {
-            // Don't calculate probabilities if no cards are dealt yet
-            if (gameState.currentStage === 'preflop') {
+            try {
+                // Don't calculate probabilities if no cards are dealt yet
+                if (gameState.currentStage === 'preflop') {
+                    for (let player of gameState.players) {
+                        player.probability = 0;
+                        player.handCategory = '';
+                        player.drawingOdds = '';
+                    }
+                    return;
+                }
+                
+                // Calculate probabilities based on current game stage
                 for (let player of gameState.players) {
-                    player.probability = 0;
+                    if (gameState.currentStage === 'dealt') {
+                        // Preflop: show hand category, not win probability
+                        player.probability = 0;
+                        player.handCategory = getPreFlopHandCategory(player.holeCards);
+                        player.drawingOdds = '';
+                    } else if (gameState.currentStage === 'flop') {
+                        // Flop: show current hand type
+                        player.probability = 0;
+                        player.handCategory = getHandRankAtStage([...player.holeCards, ...gameState.communityCards], 'flop').name;
+                        player.drawingOdds = '';
+                    } else if (gameState.currentStage === 'turn') {
+                        // Turn: show current hand type
+                        player.probability = 0;
+                        player.handCategory = getHandRankAtStage([...player.holeCards, ...gameState.communityCards], 'turn').name;
+                        player.drawingOdds = '';
+                    } else if (gameState.currentStage === 'river') {
+                        // River: show final hand type
+                        player.probability = 0;
+                        player.handCategory = getHandRankAtStage([...player.holeCards, ...gameState.communityCards], 'river').name;
+                        player.drawingOdds = '';
+                    }
                 }
-                return;
-            }
-            
-            // Calculate probabilities based on current game stage
-            for (let player of gameState.players) {
-                let probability = 0;
                 
-                if (gameState.currentStage === 'dealt') {
-                    // Preflop: based on hole card strength (0-100 scale)
-                    probability = calculateHoleCardStrength(player.holeCards);
-                } else {
-                    // Post-flop: based on hand ranking and potential
-                    probability = calculatePostFlopProbability(player.holeCards, gameState.communityCards, gameState.currentStage);
-                }
-                
-                player.probability = Math.round(probability);
-            }
-            
 
-            
-            // For river stage, use actual hand strength to determine clear winner
-            if (gameState.currentStage === 'river') {
-                // Find the best hand score
-                const handScores = gameState.players.map(player => {
-                    const allCards = [...player.holeCards, ...gameState.communityCards];
-                    const handRank = getHandRankAtStage(allCards, gameState.currentStage);
-                    return { player, score: handRank.score, handType: handRank.name };
-                });
-                
-                // Sort by score (highest first)
-                handScores.sort((a, b) => b.score - a.score);
-                
-                // Check if there's a clear winner or tie
-                const bestScore = handScores[0].score;
-                const tiedPlayers = handScores.filter(h => h.score === bestScore);
-                
-                if (tiedPlayers.length === 1) {
-                    // Clear winner - give them 95%, others share 5%
-                    for (let player of gameState.players) {
-                        if (player === tiedPlayers[0].player) {
-                            player.probability = 95;
-                        } else {
-                            player.probability = Math.round(5 / (gameState.players.length - 1));
-                        }
-                    }
-                } else {
-                    // Potential tie - use tie-breaking logic to find actual winner(s)
-                    const winners = findWinners();
-                    
-                    if (winners.length === 1) {
-                        // Tie-breaking resolved to single winner
-                        for (let i = 0; i < gameState.players.length; i++) {
-                            if (i === winners[0].id) {
-                                gameState.players[i].probability = 95;
-                            } else {
-                                gameState.players[i].probability = Math.round(5 / (gameState.players.length - 1));
-                            }
-                        }
-                    } else {
-                        // True tie - distribute evenly among winners
-                        const tieProb = Math.round(100 / winners.length);
-                        for (let i = 0; i < gameState.players.length; i++) {
-                            if (winners.some(w => w.id === i)) {
-                                gameState.players[i].probability = tieProb;
-                            } else {
-                                gameState.players[i].probability = 0;
-                            }
-                        }
-                    }
+            } catch (error) {
+                console.error('Error in calculateProbabilities:', error);
+                // Fallback: set basic probabilities
+                for (let player of gameState.players) {
+                    player.probability = Math.round(100 / gameState.players.length);
+                    player.handCategory = 'Error';
+                    player.drawingOdds = '';
                 }
-            } else {
-                // For other stages, use normal normalization
-                const total = gameState.players.reduce((sum, p) => sum + p.probability, 0);
-                if (total > 0) {
-                    for (let player of gameState.players) {
-                        player.probability = Math.round((player.probability / total) * 100);
-                    }
-                } else {
-                    // If all probabilities are 0, distribute evenly
-                    const equalProb = Math.round(100 / gameState.players.length);
-                    for (let player of gameState.players) {
-                        player.probability = equalProb;
-                    }
-                }
-            }
-            
-            // Ensure at least one player has a non-zero probability
-            const maxProb = Math.max(...gameState.players.map(p => p.probability));
-            if (maxProb === 0) {
-                gameState.players[0].probability = 100;
             }
         }
         
-        // Calculate probability for post-flop hands
-        function calculatePostFlopProbability(holeCards, communityCards, stage) {
-            const handRank = getHandRankAtStage([...holeCards, ...communityCards], stage);
-            let probability = 0;
+        // Get pre-flop hand category based on poker theory
+        function getPreFlopHandCategory(holeCards) {
+            if (!holeCards || holeCards.length < 2) return '';
             
-            // Base probability from hand strength
-            switch (handRank.name) {
-                case 'Royal Flush':
-                case 'Straight Flush':
-                    probability = 95;
-                    break;
-                case 'Four of a Kind':
-                    probability = 90;
-                    break;
-                case 'Full House':
-                    probability = 85;
-                    break;
-                case 'Flush':
-                    probability = 80;
-                    break;
-                case 'Straight':
-                    probability = 75;
-                    break;
-                case 'Three of a Kind':
-                    probability = 70;
-                    break;
-                case 'Two Pair':
-                    probability = 65;
-                    break;
-                case 'One Pair':
-                    probability = 60;
-                    break;
-                case 'High Card':
-                    probability = 40;
-                    break;
+            const card1 = holeCards[0];
+            const card2 = holeCards[1];
+            const isSuited = card1.suit === card2.suit;
+            const isPair = card1.value === card2.value;
+            const highCard = Math.max(card1.value, card2.value);
+            const lowCard = Math.min(card1.value, card2.value);
+            
+            // Pairs
+            if (isPair) {
+                if (highCard >= 13) return 'Premium Pair';      // AA, KK, QQ
+                if (highCard >= 10) return 'Strong Pair';       // JJ, TT
+                if (highCard >= 7) return 'Medium Pair';        // 99, 88, 77
+                return 'Weak Pair';                             // 66 and below
             }
             
-            // Adjust based on remaining cards to be dealt
-            if (stage === 'flop') {
-                // 2 more cards coming - high potential for improvement
-                // Add potential bonus based on hand type
-                if (handRank.name === 'High Card') {
-                    probability += 15; // High potential to improve
-                } else if (handRank.name === 'One Pair') {
-                    probability += 10; // Moderate potential
-                } else if (handRank.name === 'Two Pair') {
-                    probability += 5; // Low potential
-                }
-            } else if (stage === 'turn') {
-                // 1 more card coming - moderate potential
-                if (handRank.name === 'High Card') {
-                    probability += 8; // Moderate potential
-                } else if (handRank.name === 'One Pair') {
-                    probability += 5; // Low potential
-                }
-            } else if (stage === 'river') {
-                // Final hand - no more improvement possible
-                // For river stage, use hand score directly for more accurate probabilities
-                const score = handRank.score;
-                if (score >= 800) probability = 99; // Royal Flush
-                else if (score >= 700) probability = 98; // Four of a Kind
-                else if (score >= 600) probability = 97; // Full House
-                else if (score >= 500) probability = 95; // Flush
-                else if (score >= 400) probability = 92; // Straight
-                else if (score >= 300) probability = 88; // Three of a Kind
-                else if (score >= 200) probability = 80 + (score - 200) / 5; // Two Pair (80 + score bonus, more sensitive)
-                else if (score >= 100) probability = 75 + (score - 100) / 10; // One Pair (75 + score bonus)
-                else probability = 60 + score; // High Card (60 + card value)
+            // Suited hands
+            if (isSuited) {
+                if (highCard === 14 && lowCard >= 10) return 'Premium Suited';     // AKs, AQs, AJs
+                if (highCard === 14 && lowCard >= 8) return 'Strong Suited';       // ATs, A9s
+                if (highCard === 13 && lowCard >= 11) return 'Strong Suited';      // KQs, KJs
+                if (highCard === 12 && lowCard >= 10) return 'Medium Suited';      // QJs, QTs
+                if (highCard === 11 && lowCard >= 9) return 'Medium Suited';       // JTs, J9s
+                if (highCard === 10 && lowCard >= 8) return 'Medium Suited';       // T9s, T8s
+                if (highCard === 9 && lowCard >= 7) return 'Weak Suited';          // 98s, 97s
+                return 'Weak Suited';                                             // Lower suited
             }
             
-            // Ensure probability stays within bounds
-            return Math.min(100, Math.max(0, probability));
+            // Unsuited hands
+            if (highCard === 14 && lowCard >= 10) return 'Premium Unsuited';      // AKo, AQo
+            if (highCard === 14 && lowCard >= 8) return 'Strong Unsuited';        // AJo, ATo
+            if (highCard === 13 && lowCard >= 11) return 'Strong Unsuited';       // KQo, KJo
+            if (highCard === 12 && lowCard >= 10) return 'Medium Unsuited';       // QJo, QTo
+            if (highCard === 11 && lowCard >= 9) return 'Medium Unsuited';        // JTo, J9o
+            if (highCard === 10 && lowCard >= 8) return 'Medium Unsuited';        // T9o, T8o
+            if (highCard === 9 && lowCard >= 7) return 'Weak Unsuited';           // 98o, 97o
+            return 'Weak Unsuited';                                               // Lower unsuited
         }
         
-        function calculateHoleCardStrength(holeCards) {
-            // Return 0 if no cards are dealt
-            if (!holeCards || holeCards.length < 2) {
-                return 0;
-            }
-            
-            let strength = 0;
-            
-            // High card value (0-14 scale, convert to 0-50) - PRIORITY
-            strength += Math.max(holeCards[0].value, holeCards[1].value) * 3.5;
-            
-            // Second high card value (0-14 scale, convert to 0-25)
-            strength += Math.min(holeCards[0].value, holeCards[1].value) * 1.8;
-            
-            // Pairs (biggest boost)
-            if (holeCards[0].value === holeCards[1].value) {
-                strength += 50;
-            }
-            
-            // Suited cards (smaller bonus)
-            if (holeCards[0].suit === holeCards[1].suit) {
-                strength += 8;
-            }
-            
-            // Connected cards (smaller bonus)
-            const diff = Math.abs(holeCards[0].value - holeCards[1].value);
-            if (diff === 1) strength += 12; // Connected
-            if (diff === 2) strength += 8;  // 1 gap
-            if (diff === 3) strength += 5;  // 2 gap
-            
-            // Ensure strength stays within 0-100 range
-            return Math.min(100, Math.max(0, strength));
-        }
+
+        
+
+        
+
         
         function evaluateHandStrength(holeCards, communityCards) {
             const allCards = [...holeCards, ...communityCards];
@@ -1409,7 +1334,7 @@
         }
         
         function evaluateFiveCards(cards) {
-            // Enhanced hand ranking with pair values for exactly 5 cards
+            // Enhanced hand ranking with proper poker hierarchy
             const sorted = cards.sort((a, b) => b.value - a.value);
             const counts = {};
             const suits = {};
@@ -1429,6 +1354,7 @@
             if (isFlush) return { name: 'Flush', score: 500 };
             if (isStraight) return { name: 'Straight', score: 400 };
             if (pairs.includes(3)) return { name: 'Three of a Kind', score: 300 };
+            
             // Check for Two Pair - count how many values have exactly 2 cards
             const pairValues = Object.entries(counts)
                 .filter(([value, count]) => count === 2)
@@ -1436,18 +1362,19 @@
                 .sort((a, b) => b - a); // Sort pairs in descending order
             
             if (pairValues.length >= 2) {
-                // Two Pair - include the values of the pairs in the score
+                // Two Pair - use a score that's always less than Three of a Kind
                 const kicker = sorted.find(card => card.value !== pairValues[0] && card.value !== pairValues[1]);
-                const score = 200 + (pairValues[0] * 10) + pairValues[1] + (kicker ? kicker.value : 0);
+                const score = 200 + (pairValues[0] * 2) + (pairValues[1] * 2) + (kicker ? kicker.value : 0);
                 console.log(`Two Pair detected: ${pairValues[0]}s and ${pairValues[1]}s with ${kicker ? getCardName(kicker) : 'no'} kicker`);
                 return { name: 'Two Pair', score: score };
             }
+            
             if (pairs.includes(2)) {
-                // One Pair - include the pair value and kickers in the score
+                // One Pair - use a score that's always less than Two Pair
                 const pairValue = Object.entries(counts).find(([value, count]) => count === 2)[0];
                 const kickers = sorted.filter(card => card.value !== parseInt(pairValue)).slice(0, 3);
                 const kickerSum = kickers.reduce((sum, card) => sum + card.value, 0);
-                const score = 100 + (parseInt(pairValue) * 10) + kickerSum;
+                const score = 100 + (parseInt(pairValue) * 2) + kickerSum;
                 console.log(`One Pair detected: ${getCardName({ value: parseInt(pairValue), suit: '♠' })}s with kickers: ${kickers.map(k => getCardName(k)).join(', ')}`);
                 return { name: 'One Pair', score: score };
             }
@@ -1625,22 +1552,33 @@
                 return 0; // Complete tie
             });
             
-            // Check if there's a true tie (all 5 cards are the same)
+            // Check if there are true ties among ALL players, not just first 2
             if (winners.length > 1) {
                 const firstCards = [...winners[0].holeCards, ...gameState.communityCards].sort((x, y) => y.value - x.value).slice(0, 5);
-                const secondCards = [...winners[1].holeCards, ...gameState.communityCards].sort((x, y) => y.value - x.value).slice(0, 5);
+                let trueTiePlayers = [winners[0]];
                 
-                let isTrueTie = true;
-                for (let i = 0; i < 5; i++) {
-                    if (firstCards[i].value !== secondCards[i].value) {
-                        isTrueTie = false;
+                for (let i = 1; i < winners.length; i++) {
+                    const currentCards = [...winners[i].holeCards, ...gameState.communityCards].sort((x, y) => y.value - x.value).slice(0, 5);
+                    let isTrueTie = true;
+                    
+                    for (let j = 0; j < 5; j++) {
+                        if (firstCards[j].value !== currentCards[j].value) {
+                            isTrueTie = false;
+                            break;
+                        }
+                    }
+                    
+                    if (isTrueTie) {
+                        trueTiePlayers.push(winners[i]);
+                    } else {
+                        // Found a player with lower kickers, stop checking
                         break;
                     }
                 }
                 
-                if (isTrueTie) {
-                    // True tie - return all winners
-                    return winners;
+                if (trueTiePlayers.length > 1) {
+                    // True tie - return all tied players
+                    return trueTiePlayers;
                 }
             }
             
@@ -1670,19 +1608,31 @@
                 return 0;
             });
             
-            // Check if there's a true tie (same pair and all kickers)
+            // Check if there are true ties among ALL players, not just first 2
             if (winners.length > 1) {
                 const firstPair = findPairValue([...winners[0].holeCards, ...gameState.communityCards]);
-                const secondPair = findPairValue([...winners[1].holeCards, ...gameState.communityCards]);
                 const firstKickers = getKickers([...winners[0].holeCards, ...gameState.communityCards], firstPair);
-                const secondKickers = getKickers([...winners[1].holeCards, ...gameState.communityCards], secondPair);
+                let trueTiePlayers = [winners[0]];
                 
-                if (firstPair === secondPair && 
-                    firstKickers[0] === secondKickers[0] &&
-                    firstKickers[1] === secondKickers[1] &&
-                    firstKickers[2] === secondKickers[2]) {
-                    // True tie - return all winners
-                    return winners;
+                for (let i = 1; i < winners.length; i++) {
+                    const currentPair = findPairValue([...winners[i].holeCards, ...gameState.communityCards]);
+                    const currentKickers = getKickers([...winners[i].holeCards, ...gameState.communityCards], currentPair);
+                    
+                    if (firstPair === currentPair && 
+                        firstKickers[0] === currentKickers[0] &&
+                        firstKickers[1] === currentKickers[1] &&
+                        firstKickers[2] === currentKickers[2]) {
+                        // True tie - add to tied players
+                        trueTiePlayers.push(winners[i]);
+                    } else {
+                        // Found a player with lower kickers, stop checking
+                        break;
+                    }
+                }
+                
+                if (trueTiePlayers.length > 1) {
+                    // True tie - return all tied players
+                    return trueTiePlayers;
                 }
             }
             
@@ -1719,14 +1669,26 @@
                 return bKicker - aKicker; // Higher kicker wins
             });
             
-            // Check if there's a true tie (same kicker)
+            // Check if there are true ties among ALL players, not just first 2
             if (winners.length > 1) {
                 const firstKicker = getFourOfAKindKicker([...winners[0].holeCards, ...gameState.communityCards]);
-                const secondKicker = getFourOfAKindKicker([...winners[1].holeCards, ...gameState.communityCards]);
+                let trueTiePlayers = [winners[0]];
                 
-                if (firstKicker === secondKicker) {
-                    // True tie - return all winners
-                    return winners;
+                for (let i = 1; i < winners.length; i++) {
+                    const currentKicker = getFourOfAKindKicker([...winners[i].holeCards, ...gameState.communityCards]);
+                    
+                    if (firstKicker === currentKicker) {
+                        // True tie - add to tied players
+                        trueTiePlayers.push(winners[i]);
+                    } else {
+                        // Found a player with lower kicker, stop checking
+                        break;
+                    }
+                }
+                
+                if (trueTiePlayers.length > 1) {
+                    // True tie - return all tied players
+                    return trueTiePlayers;
                 }
             }
             
@@ -1779,18 +1741,30 @@
                 return 0;
             });
             
-            // Check if there's a true tie (same three-of-a-kind and kickers)
+            // Check if there are true ties among ALL players, not just first 2
             if (winners.length > 1) {
                 const firstThreeValue = getThreeOfAKindValue([...winners[0].holeCards, ...gameState.communityCards]);
-                const secondThreeValue = getThreeOfAKindValue([...winners[1].holeCards, ...gameState.communityCards]);
                 const firstKickers = getThreeOfAKindKickers([...winners[0].holeCards, ...gameState.communityCards], firstThreeValue);
-                const secondKickers = getThreeOfAKindKickers([...winners[1].holeCards, ...gameState.communityCards], secondThreeValue);
+                let trueTiePlayers = [winners[0]];
                 
-                if (firstThreeValue === secondThreeValue &&
-                    firstKickers[0] === secondKickers[0] &&
-                    firstKickers[1] === secondKickers[1]) {
-                    // True tie - return all winners
-                    return winners;
+                for (let i = 1; i < winners.length; i++) {
+                    const currentThreeValue = getThreeOfAKindValue([...winners[i].holeCards, ...gameState.communityCards]);
+                    const currentKickers = getThreeOfAKindKickers([...winners[i].holeCards, ...gameState.communityCards], currentThreeValue);
+                    
+                    if (firstThreeValue === currentThreeValue &&
+                        firstKickers[0] === currentKickers[0] &&
+                        firstKickers[1] === currentKickers[1]) {
+                        // True tie - add to tied players
+                        trueTiePlayers.push(winners[i]);
+                    } else {
+                        // Found a player with lower three-of-a-kind or kickers, stop checking
+                        break;
+                    }
+                }
+                
+                if (trueTiePlayers.length > 1) {
+                    // True tie - return all tied players
+                    return trueTiePlayers;
                 }
             }
             
@@ -1834,15 +1808,27 @@
                 return bFullHouse.pairValue - aFullHouse.pairValue;
             });
             
-            // Check if there's a true tie (same three-of-a-kind and pair)
+            // Check if there are true ties among ALL players, not just first 2
             if (winners.length > 1) {
                 const firstFullHouse = getFullHouseValues([...winners[0].holeCards, ...gameState.communityCards]);
-                const secondFullHouse = getFullHouseValues([...winners[1].holeCards, ...gameState.communityCards]);
+                let trueTiePlayers = [winners[0]];
                 
-                if (firstFullHouse.threeValue === secondFullHouse.threeValue &&
-                    firstFullHouse.pairValue === secondFullHouse.pairValue) {
-                    // True tie - return all winners
-                    return winners;
+                for (let i = 1; i < winners.length; i++) {
+                    const currentFullHouse = getFullHouseValues([...winners[i].holeCards, ...gameState.communityCards]);
+                    
+                    if (firstFullHouse.threeValue === currentFullHouse.threeValue &&
+                        firstFullHouse.pairValue === currentFullHouse.pairValue) {
+                        // True tie - add to tied players
+                        trueTiePlayers.push(winners[i]);
+                    } else {
+                        // Found a player with lower three-of-a-kind or pair, stop checking
+                        break;
+                    }
+                }
+                
+                if (trueTiePlayers.length > 1) {
+                    // True tie - return all tied players
+                    return trueTiePlayers;
                 }
             }
             
@@ -1891,16 +1877,28 @@
                 return bTwoPair.kicker - aTwoPair.kicker;
             });
             
-            // Check if there's a true tie (same higher pair, lower pair, and kicker)
+            // Check if there are true ties among ALL players, not just first 2
             if (winners.length > 1) {
                 const firstTwoPair = getTwoPairValues([...winners[0].holeCards, ...gameState.communityCards]);
-                const secondTwoPair = getTwoPairValues([...winners[1].holeCards, ...gameState.communityCards]);
+                let trueTiePlayers = [winners[0]];
                 
-                if (firstTwoPair.higherPair === secondTwoPair.higherPair &&
-                    firstTwoPair.lowerPair === secondTwoPair.lowerPair &&
-                    firstTwoPair.kicker === secondTwoPair.kicker) {
-                    // True tie - return all winners
-                    return winners;
+                for (let i = 1; i < winners.length; i++) {
+                    const currentTwoPair = getTwoPairValues([...winners[i].holeCards, ...gameState.communityCards]);
+                    
+                    if (firstTwoPair.higherPair === currentTwoPair.higherPair &&
+                        firstTwoPair.lowerPair === currentTwoPair.lowerPair &&
+                        firstTwoPair.kicker === currentTwoPair.kicker) {
+                        // True tie - add to tied players
+                        trueTiePlayers.push(winners[i]);
+                    } else {
+                        // Found a player with lower pairs/kicker, stop checking
+                        break;
+                    }
+                }
+                
+                if (trueTiePlayers.length > 1) {
+                    // True tie - return all tied players
+                    return trueTiePlayers;
                 }
             }
             
@@ -1947,15 +1945,27 @@
                 return 0;
             });
             
-            // Check if there's a true tie (same highest card)
+            // Check if there are true ties among ALL players, not just first 2
             if (winners.length > 1) {
                 const firstStraight = findHighestStraight([...winners[0].holeCards, ...gameState.communityCards]);
-                const secondStraight = findHighestStraight([...winners[1].holeCards, ...gameState.communityCards]);
+                let trueTiePlayers = [winners[0]];
                 
-                if (firstStraight.length > 0 && secondStraight.length > 0 && 
-                    firstStraight[0].value === secondStraight[0].value) {
-                    // True tie - return all winners
-                    return winners;
+                for (let i = 1; i < winners.length; i++) {
+                    const currentStraight = findHighestStraight([...winners[i].holeCards, ...gameState.communityCards]);
+                    
+                    if (firstStraight.length > 0 && currentStraight.length > 0 && 
+                        firstStraight[0].value === currentStraight[0].value) {
+                        // True tie - add to tied players
+                        trueTiePlayers.push(winners[i]);
+                    } else {
+                        // Found a player with lower straight, stop checking
+                        break;
+                    }
+                }
+                
+                if (trueTiePlayers.length > 1) {
+                    // True tie - return all tied players
+                    return trueTiePlayers;
                 }
             }
             
@@ -1980,24 +1990,39 @@
                 return 0;
             });
             
-            // Check if there's a true tie (all 5 flush cards are the same)
+            // Check if there are true ties among ALL players, not just first 2
             if (winners.length > 1) {
                 const firstFlush = getFlushCards([...winners[0].holeCards, ...gameState.communityCards]);
-                const secondFlush = getFlushCards([...winners[1].holeCards, ...gameState.communityCards]);
+                let trueTiePlayers = [winners[0]];
                 
-                if (firstFlush.length > 0 && secondFlush.length > 0) {
-                    let isTrueTie = true;
-                    for (let i = 0; i < 5; i++) {
-                        if (firstFlush[i].value !== secondFlush[i].value) {
-                            isTrueTie = false;
+                for (let i = 1; i < winners.length; i++) {
+                    const currentFlush = getFlushCards([...winners[i].holeCards, ...gameState.communityCards]);
+                    
+                    if (firstFlush.length > 0 && currentFlush.length > 0) {
+                        let isTrueTie = true;
+                        for (let j = 0; j < 5; j++) {
+                            if (firstFlush[j].value !== currentFlush[j].value) {
+                                isTrueTie = false;
+                                break;
+                            }
+                        }
+                        
+                        if (isTrueTie) {
+                            // True tie - add to tied players
+                            trueTiePlayers.push(winners[i]);
+                        } else {
+                            // Found a player with lower flush, stop checking
                             break;
                         }
+                    } else {
+                        // Found a player with lower flush, stop checking
+                        break;
                     }
-                    
-                    if (isTrueTie) {
-                        // True tie - return all winners
-                        return winners;
-                    }
+                }
+                
+                if (trueTiePlayers.length > 1) {
+                    // True tie - return all tied players
+                    return trueTiePlayers;
                 }
             }
             
@@ -2696,42 +2721,7 @@
             return `Both players have Royal Flush, but ${actualWinner.name} wins due to suit ranking.`;
         }
         
-        // Function to get detailed hand description for tooltips
-        function getDetailedHandDescription(player) {
-            if (gameState.currentStage === 'preflop' || gameState.currentStage === 'dealt') {
-                // No tooltip before flop is dealt
-                return '';
-            }
-            
-            const handRank = getHandRankAtStage([...player.holeCards, ...gameState.communityCards], gameState.currentStage);
-            let description = `${handRank.name}`;
-            
-            // Add specific details for certain hand types
-            if (handRank.name === 'High Card') {
-                const highCard = getHighCardName([...player.holeCards, ...gameState.communityCards]);
-                description += `\n${highCard}`;
-            } else if (handRank.name === 'One Pair') {
-                const pairValue = findPairValue([...player.holeCards, ...gameState.communityCards]);
-                const pairName = getCardName({ value: pairValue, suit: '♠' });
-                description += `\nPair of ${pairName}s`;
-            } else if (handRank.name === 'Two Pair') {
-                description += '\nTwo Pairs';
-            } else if (handRank.name === 'Three of a Kind') {
-                description += '\nThree Matching Cards';
-            } else if (handRank.name === 'Straight') {
-                description += '\nFive Consecutive Cards';
-            } else if (handRank.name === 'Flush') {
-                description += '\nFive Same Suit';
-            } else if (handRank.name === 'Full House') {
-                description += '\nThree + Two Matching';
-            } else if (handRank.name === 'Four of a Kind') {
-                description += '\nFour Matching Cards';
-            } else if (handRank.name === 'Straight Flush') {
-                description += '\nStraight + Same Suit';
-            }
-            
-            return description;
-        }
+
         
         // New function to evaluate hand strength based on current game stage
         function evaluateHandStrengthAtStage(holeCards, communityCards, stage) {
@@ -2911,52 +2901,74 @@
             let detailedExplanation = '';
             if (winners.length === 1) {
                 if (isCorrect) {
-                    // User correctly predicted the winner - explain why they won in detail
+                    // User correctly predicted the winner - show detailed hand information
                     const winnerHand = getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage);
-                    const otherPlayers = gameState.players.filter(p => p.id !== winners[0].id);
+                    let winnerDetails = `${winners[0].name} won with ${winnerHand.name}`;
                     
-                    // Build detailed explanation of why the winner won
-                    let winReasons = [];
-                    
-                    // Compare with each other player
-                    for (let otherPlayer of otherPlayers) {
-                        const otherHand = getHandRankAtStage([...otherPlayer.holeCards, ...gameState.communityCards], gameState.currentStage);
-                        
-                        if (winnerHand.name !== otherHand.name) {
-                            // Different hand types - explain the ranking
-                            winReasons.push(`${winners[0].name}'s ${winnerHand.name} beats ${otherPlayer.name}'s ${otherHand.name} because ${winnerHand.name} ranks higher than ${otherHand.name} in poker hand rankings.`);
-                        } else {
-                            // Same hand type - explain why one is better
-                            if (winnerHand.name === 'High Card') {
-                                winReasons.push(getHighCardComparison(otherPlayer, winners[0]));
-                            } else if (winnerHand.name === 'One Pair') {
-                                winReasons.push(getOnePairComparison(otherPlayer, winners[0]));
-                            } else if (winnerHand.name === 'Two Pair') {
-                                winReasons.push(getTwoPairComparison(otherPlayer, winners[0]));
-                            } else if (winnerHand.name === 'Three of a Kind') {
-                                winReasons.push(getThreeOfAKindComparison(otherPlayer, winners[0]));
-                            } else if (winnerHand.name === 'Straight') {
-                                winReasons.push(getStraightComparison(otherPlayer, winners[0]));
-                            } else if (winnerHand.name === 'Flush') {
-                                winReasons.push(getFlushComparison(otherPlayer, winners[0]));
-                            } else if (winnerHand.name === 'Full House') {
-                                winReasons.push(getFullHouseComparison(otherPlayer, winners[0]));
-                            } else if (winnerHand.name === 'Four of a Kind') {
-                                winReasons.push(getFourOfAKindComparison(otherPlayer, winners[0]));
-                            } else if (winnerHand.name === 'Straight Flush') {
-                                winReasons.push(getStraightFlushComparison(otherPlayer, winners[0]));
-                            } else if (winnerHand.name === 'Royal Flush') {
-                                winReasons.push(getRoyalFlushComparison(otherPlayer, winners[0]));
-                            } else {
-                                winReasons.push(`Both players have ${winnerHand.name}, but ${winners[0].name} has a stronger version.`);
-                            }
+                    // Add specific details for the winning hand
+                    if (winnerHand.name === 'High Card') {
+                        const highCard = getHighCardName([...winners[0].holeCards, ...gameState.communityCards]);
+                        winnerDetails += ` (${highCard})`;
+                    } else if (winnerHand.name === 'One Pair') {
+                        const pairValue = findPairValue([...winners[0].holeCards, ...gameState.communityCards]);
+                        const pairName = getCardName({ value: pairValue, suit: '♠' });
+                        winnerDetails += ` (${pairName}s)`;
+                    } else if (winnerHand.name === 'Two Pair') {
+                        const pairValues = Object.entries(getCardCounts([...winners[0].holeCards, ...gameState.communityCards]))
+                            .filter(([value, count]) => count === 2)
+                            .map(([value, count]) => parseInt(value))
+                            .sort((a, b) => b - a);
+                        winnerDetails += ` (${getCardName({ value: pairValues[0], suit: '♠' })}s and ${getCardName({ value: pairValues[1], suit: '♠' })}s)`;
+                    } else if (winnerHand.name === 'Three of a Kind') {
+                        const counts = getCardCounts([...winners[0].holeCards, ...gameState.communityCards]);
+                        const threeValueEntry = Object.entries(counts).find(([value, count]) => count === 3);
+                        if (threeValueEntry) {
+                            const threeValue = threeValueEntry[0];
+                            winnerDetails += ` (${getCardName({ value: parseInt(threeValue), suit: '♠' })}s)`;
                         }
+                    } else if (winnerHand.name === 'Full House') {
+                        const counts = getCardCounts([...winners[0].holeCards, ...gameState.communityCards]);
+                        const threeValEntry = Object.entries(counts).find(([value, count]) => count === 3);
+                        const twoValEntry = Object.entries(counts).find(([value, count]) => count === 2);
+                        if (threeValEntry && twoValEntry) {
+                            const threeVal = threeValEntry[0];
+                            const twoVal = twoValEntry[0];
+                            winnerDetails += ` (${getCardName({ value: parseInt(threeVal), suit: '♠' })}s full of ${getCardName({ value: parseInt(twoVal), suit: '♠' })}s)`;
+                        }
+                    } else if (winnerHand.name === 'Four of a Kind') {
+                        const counts = getCardCounts([...winners[0].holeCards, ...gameState.communityCards]);
+                        const fourValueEntry = Object.entries(counts).find(([value, count]) => count === 4);
+                        if (fourValueEntry) {
+                            const fourValue = fourValueEntry[0];
+                            winnerDetails += ` (${getCardName({ value: parseInt(fourValue), suit: '♠' })}s)`;
+                        }
+                    } else if (winnerHand.name === 'Straight') {
+                        const straight = findHighestStraight([...winners[0].holeCards, ...gameState.communityCards]);
+                        if (straight && straight.length > 0) {
+                            winnerDetails += ` (${getCardName(straight[0])} high)`;
+                        }
+                    } else if (winnerHand.name === 'Flush') {
+                        const suits = {};
+                        for (let card of [...winners[0].holeCards, ...gameState.communityCards]) {
+                            suits[card.suit] = (suits[card.suit] || 0) + 1;
+                        }
+                        const flushSuit = Object.entries(suits).find(([suit, count]) => count >= 5)[0];
+                        winnerDetails += ` (${getSuitName(flushSuit)} flush)`;
                     }
                     
-                    detailedExplanation = `🎯 ${winners[0].name} won with ${winnerHand.name}! Here's why:\n\n${winReasons.join('\n\n')}`;
+                    detailedExplanation = `🎯 ${winnerDetails}!`;
                 } else {
-                    // User incorrectly predicted - explain why the selected player lost
-                    detailedExplanation = getDetailedWinExplanation(selectedPlayer, winners[0]);
+                    // User incorrectly predicted - explain why the actual winner won
+                    const actualHand = getHandRankAtStage([...winners[0].holeCards, ...gameState.communityCards], gameState.currentStage);
+                    const selectedHand = getHandRankAtStage([...selectedPlayer.holeCards, ...gameState.communityCards], gameState.currentStage);
+                    
+                    // If both players have the same hand type, explain the kicker difference
+                    if (actualHand.name === selectedHand.name) {
+                        const kickerExplanation = getKickerExplanation(selectedPlayer, winners[0], actualHand.name);
+                        detailedExplanation = `❌ Both players have ${actualHand.name}, but ${winners[0].name} won with ${kickerExplanation}.`;
+                    } else {
+                        detailedExplanation = `❌ ${selectedPlayer.name} didn't win. ${winners[0].name} won with ${actualHand.name}.`;
+                    }
                 }
             } else {
                 // For ties, explain why they tied
@@ -2988,19 +3000,31 @@
                 } else if (handRank.name === 'One Pair') {
                     const pairValue = findPairValue([...player.holeCards, ...gameState.communityCards]);
                     const pairName = getCardName({ value: pairValue, suit: '♠' });
-                    handDescription += ` (${pairName}s)`;
+                    const kickers = getKickers([...player.holeCards, ...gameState.communityCards], pairValue);
+                    const kickerNames = kickers.map(k => getCardName({ value: k, suit: '♠' })).join(', ');
+                    handDescription += ` (${pairName}s with ${kickerNames} kickers)`;
                 } else if (handRank.name === 'Two Pair') {
                     const pairValues = Object.entries(getCardCounts([...player.holeCards, ...gameState.communityCards]))
                         .filter(([value, count]) => count === 2)
                         .map(([value, count]) => parseInt(value))
                         .sort((a, b) => b - a);
-                    handDescription += ` (${getCardName({ value: pairValues[0], suit: '♠' })}s and ${getCardName({ value: pairValues[1], suit: '♠' })}s)`;
+                    const kicker = [...player.holeCards, ...gameState.communityCards].find(card => 
+                        card.value !== pairValues[0] && card.value !== pairValues[1]
+                    );
+                    const kickerName = kicker ? getCardName(kicker) : 'no';
+                    handDescription += ` (${getCardName({ value: pairValues[0], suit: '♠' })}s and ${getCardName({ value: pairValues[1], suit: '♠' })}s with ${kickerName} kicker)`;
                 } else if (handRank.name === 'Three of a Kind') {
                     const counts = getCardCounts([...player.holeCards, ...gameState.communityCards]);
                     const threeValueEntry = Object.entries(counts).find(([value, count]) => count === 3);
                     if (threeValueEntry) {
                         const threeValue = threeValueEntry[0];
-                        handDescription += ` (${getCardName({ value: parseInt(threeValue), suit: '♠' })}s)`;
+                        const kickers = [...player.holeCards, ...gameState.communityCards]
+                            .filter(card => card.value !== parseInt(threeValue))
+                            .sort((a, b) => b.value - a.value)
+                            .slice(0, 2)
+                            .map(card => getCardName(card))
+                            .join(', ');
+                        handDescription += ` (${getCardName({ value: parseInt(threeValue), suit: '♠' })}s with ${kickers} kickers)`;
                     } else {
                         handDescription += ` (Three of a Kind)`;
                     }
@@ -3020,7 +3044,9 @@
                     const fourValueEntry = Object.entries(counts).find(([value, count]) => count === 4);
                     if (fourValueEntry) {
                         const fourValue = fourValueEntry[0];
-                        handDescription += ` (${getCardName({ value: parseInt(fourValue), suit: '♠' })}s)`;
+                        const kicker = [...player.holeCards, ...gameState.communityCards].find(card => card.value !== parseInt(fourValue));
+                        const kickerName = kicker ? getCardName(kicker) : 'no';
+                        handDescription += ` (${getCardName({ value: parseInt(fourValue), suit: '♠' })}s with ${kickerName} kicker)`;
                     } else {
                         handDescription += ` (Four of a Kind)`;
                     }
@@ -3049,12 +3075,10 @@
                 <div class="hand-explanation" style="background: ${isTie ? 'rgba(255, 165, 0, 0.2)' : (isCorrect ? 'rgba(39, 174, 96, 0.2)' : 'rgba(231, 76, 60, 0.2)')}; border: 2px solid ${isTie ? 'rgba(255, 165, 0, 0.5)' : (isCorrect ? 'rgba(39, 174, 96, 0.5)' : 'rgba(231, 76, 60, 0.5)')};">
                     ${mainMessage}
                 </div>
-                ${detailedExplanation ? `
-                    <div class="hand-explanation">
-                        <strong>📚 Why this happened:</strong><br>
-                        ${detailedExplanation}
-                    </div>
-                ` : ''}
+                <div class="hand-explanation">
+                    <strong>📚 Why this happened:</strong><br>
+                    ${detailedExplanation}
+                </div>
                 <div class="hand-explanation">
                     ${allPlayerHands}
                 </div>
@@ -3168,36 +3192,38 @@
                 
                 let cardsHtml = '';
                 if (player.holeCards.length > 0) {
-                    // Get detailed hand description for tooltip
-                    const handDescription = getDetailedHandDescription(player);
-                    
                     for (let card of player.holeCards) {
                         const color = (card.suit === '♥' || card.suit === '♦') ? 'red' : 'black';
-                        if (handDescription) {
-                            cardsHtml += `<div class="card" style="color: ${color}" title="${handDescription}">${card.rank}${card.suit}</div>`;
-                        } else {
-                            cardsHtml += `<div class="card" style="color: ${color}">${card.rank}${card.suit}</div>`;
-                        }
+                        cardsHtml += `<div class="card" style="color: ${color}">${card.rank}${card.suit}</div>`;
                     }
                 } else {
-                    cardsHtml = '<div class="card hidden" title="No cards dealt yet"></div><div class="card hidden" title="No cards dealt yet"></div>';
+                    cardsHtml = '<div class="card hidden"></div><div class="card hidden"></div>';
                 }
                 
-                // Only show probability and winner button if cards are dealt
-                let probabilityHtml = '';
+                // Show different information based on game stage
+                let infoHtml = '';
                 let winnerButtonHtml = '';
                 
                 if (player.holeCards.length > 0) {
-                    probabilityHtml = `<div class="probability">Win Probability: ${player.probability}%</div>`;
-                    winnerButtonHtml = `<button class="winner-btn" data-player="${player.id}" onclick="selectWinner(${player.id})">
-                        Select as Winner
-                    </button>`;
+                    if (gameState.currentStage === 'dealt') {
+                        // Pre-flop: show hand category
+                        infoHtml = `<div class="probability">${player.handCategory}</div>`;
+                    } else if (gameState.currentStage === 'flop' || gameState.currentStage === 'turn') {
+                        // Flop/Turn: show current hand only
+                        infoHtml = `<div class="probability">${player.handCategory}</div>`;
+                    } else if (gameState.currentStage === 'river') {
+                        // River: show final hand type and winner button
+                        infoHtml = `<div class="probability">${player.handCategory}</div>`;
+                        winnerButtonHtml = `<button class="winner-btn" data-player="${player.id}" onclick="selectWinner(${player.id})">
+                            Select as Winner
+                        </button>`;
+                    }
                 }
                 
                 playerDiv.innerHTML = `
                     <h3>${player.name}</h3>
                     <div class="player-cards">${cardsHtml}</div>
-                    ${probabilityHtml}
+                    ${infoHtml}
                     ${winnerButtonHtml}
                 `;
                 
@@ -3313,6 +3339,238 @@
             }
         }
 
+        // New function to explain kicker differences when players have the same hand type
+        function getKickerExplanation(loser, winner, handType) {
+            const loserCards = [...loser.holeCards, ...gameState.communityCards];
+            const winnerCards = [...winner.holeCards, ...gameState.communityCards];
+            
+            switch (handType) {
+                case 'High Card':
+                    return getHighCardKickerExplanation(loserCards, winnerCards);
+                    
+                case 'One Pair':
+                    return getOnePairKickerExplanation(loserCards, winnerCards);
+                    
+                case 'Two Pair':
+                    return getTwoPairKickerExplanation(loserCards, winnerCards);
+                    
+                case 'Three of a Kind':
+                    return getThreeOfAKindKickerExplanation(loserCards, winnerCards);
+                    
+                case 'Straight':
+                    return getStraightKickerExplanation(loserCards, winnerCards);
+                    
+                case 'Flush':
+                    return getFlushKickerExplanation(loserCards, winnerCards);
+                    
+                case 'Full House':
+                    return getFullHouseKickerExplanation(loserCards, winnerCards);
+                    
+                case 'Four of a Kind':
+                    return getFourOfAKindKickerExplanation(loserCards, winnerCards);
+                    
+                default:
+                    return 'a better kicker';
+            }
+        }
+        
+        // Helper functions for specific kicker explanations
+        function getHighCardKickerExplanation(loserCards, winnerCards) {
+            const loserSorted = loserCards.sort((a, b) => b.value - a.value).slice(0, 5);
+            const winnerSorted = winnerCards.sort((a, b) => b.value - a.value).slice(0, 5);
+            
+            for (let i = 0; i < 5; i++) {
+                if (loserSorted[i].value !== winnerSorted[i].value) {
+                    const winnerCard = getCardName(winnerSorted[i]);
+                    const loserCard = getCardName(loserSorted[i]);
+                    if (i === 0) {
+                        return `${winnerCard} high vs ${loserCard} high`;
+                    } else if (i === 1) {
+                        return `${winnerCard} second vs ${loserCard} second`;
+                    } else if (i === 2) {
+                        return `${winnerCard} third vs ${loserCard} third`;
+                    } else if (i === 3) {
+                        return `${winnerCard} fourth vs ${loserCard} fourth`;
+                    } else {
+                        return `${winnerCard} fifth vs ${loserCard} fifth`;
+                    }
+                }
+            }
+            return 'a better kicker';
+        }
+        
+        function getOnePairKickerExplanation(loserCards, winnerCards) {
+            const loserPair = findPairValue(loserCards);
+            const winnerPair = findPairValue(winnerCards);
+            
+            if (loserPair !== winnerPair) {
+                const winnerPairName = getCardName({ value: winnerPair, suit: '♠' });
+                const loserPairName = getCardName({ value: loserPair, suit: '♠' });
+                return `${winnerPairName}s vs ${loserPairName}s`;
+            }
+            
+            // Same pair, compare kickers
+            const loserKickers = getKickers(loserCards, loserPair);
+            const winnerKickers = getKickers(winnerCards, winnerPair);
+            
+            for (let i = 0; i < 3; i++) {
+                if (loserKickers[i] !== winnerKickers[i]) {
+                    const winnerKicker = getCardName({ value: winnerKickers[i], suit: '♠' });
+                    const loserKicker = getCardName({ value: loserKickers[i], suit: '♠' });
+                    if (i === 0) {
+                        return `${winnerKicker} kicker vs ${loserKicker} kicker`;
+                    } else if (i === 1) {
+                        return `${winnerKicker} second kicker vs ${loserKicker} second kicker`;
+                    } else {
+                        return `${winnerKicker} third kicker vs ${loserKicker} third kicker`;
+                    }
+                }
+            }
+            return 'a better kicker';
+        }
+        
+        function getTwoPairKickerExplanation(loserCards, winnerCards) {
+            const loserTwoPair = getTwoPairValues(loserCards);
+            const winnerTwoPair = getTwoPairValues(winnerCards);
+            
+            // Compare higher pair first
+            if (loserTwoPair.higherPair !== winnerTwoPair.higherPair) {
+                const winnerHighPair = getCardName({ value: winnerTwoPair.higherPair, suit: '♠' });
+                const loserHighPair = getCardName({ value: loserTwoPair.higherPair, suit: '♠' });
+                return `${winnerHighPair}s vs ${loserHighPair}s as high pair`;
+            }
+            
+            // Same high pair, compare lower pair
+            if (loserTwoPair.lowerPair !== winnerTwoPair.lowerPair) {
+                const winnerLowPair = getCardName({ value: winnerTwoPair.lowerPair, suit: '♠' });
+                const loserLowPair = getCardName({ value: loserTwoPair.lowerPair, suit: '♠' });
+                return `${winnerLowPair}s vs ${loserLowPair}s as second pair`;
+            }
+            
+            // Same pairs, compare kicker
+            if (loserTwoPair.kicker !== winnerTwoPair.kicker) {
+                const winnerKicker = getCardName({ value: winnerTwoPair.kicker, suit: '♠' });
+                const loserKicker = getCardName({ value: loserTwoPair.kicker, suit: '♠' });
+                return `${winnerKicker} kicker vs ${loserKicker} kicker`;
+            }
+            
+            return 'a better kicker';
+        }
+        
+        function getThreeOfAKindKickerExplanation(loserCards, winnerCards) {
+            const loserThreeValue = getThreeOfAKindValue(loserCards);
+            const winnerThreeValue = getThreeOfAKindValue(winnerCards);
+            
+            if (loserThreeValue !== winnerThreeValue) {
+                const winnerThreeName = getCardName({ value: winnerThreeValue, suit: '♠' });
+                const loserThreeName = getCardName({ value: loserThreeValue, suit: '♠' });
+                return `${winnerThreeName}s vs ${loserThreeName}s`;
+            }
+            
+            // Same three of a kind, compare kickers
+            const loserKickers = getThreeOfAKindKickers(loserCards, loserThreeValue);
+            const winnerKickers = getThreeOfAKindKickers(winnerCards, winnerThreeValue);
+            
+            for (let i = 0; i < 2; i++) {
+                if (loserKickers[i] !== winnerKickers[i]) {
+                    const winnerKicker = getCardName({ value: winnerKickers[i], suit: '♠' });
+                    const loserKicker = getCardName({ value: loserKickers[i], suit: '♠' });
+                    if (i === 0) {
+                        return `${winnerKicker} kicker vs ${loserKicker} kicker`;
+                    } else {
+                        return `${winnerKicker} second kicker vs ${loserKicker} second kicker`;
+                    }
+                }
+            }
+            return 'a better kicker';
+        }
+        
+        function getStraightKickerExplanation(loserCards, winnerCards) {
+            const loserStraight = findHighestStraight(loserCards);
+            const winnerStraight = findHighestStraight(winnerCards);
+            
+            if (loserStraight.length > 0 && winnerStraight.length > 0) {
+                const winnerTopCard = getCardName(winnerStraight[0]);
+                const loserTopCard = getCardName(loserStraight[0]);
+                return `${winnerTopCard} high vs ${loserTopCard} high`;
+            }
+            return 'a better straight';
+        }
+        
+        function getFlushKickerExplanation(loserCards, winnerCards) {
+            const loserFlush = getFlushCards(loserCards);
+            const winnerFlush = getFlushCards(winnerCards);
+            
+            if (loserFlush.length > 0 && winnerFlush.length > 0) {
+                for (let i = 0; i < 5; i++) {
+                    if (loserFlush[i].value !== winnerFlush[i].value) {
+                        const winnerCard = getCardName(winnerFlush[i]);
+                        const loserCard = getCardName(loserFlush[i]);
+                        if (i === 0) {
+                            return `${winnerCard} high vs ${loserCard} high`;
+                        } else {
+                            return `${winnerCard} vs ${loserCard} as ${i + 1}${getOrdinalSuffix(i + 1)} highest`;
+                        }
+                    }
+                }
+            }
+            return 'a better flush';
+        }
+        
+        function getFullHouseKickerExplanation(loserCards, winnerCards) {
+            const loserFullHouse = getFullHouseValues(loserCards);
+            const winnerFullHouse = getFullHouseValues(winnerCards);
+            
+            // Compare three of a kind first
+            if (loserFullHouse.threeValue !== winnerFullHouse.threeValue) {
+                const winnerThreeName = getCardName({ value: winnerFullHouse.threeValue, suit: '♠' });
+                const loserThreeName = getCardName({ value: loserFullHouse.threeValue, suit: '♠' });
+                return `${winnerThreeName}s vs ${loserThreeName}s as three of a kind`;
+            }
+            
+            // Same three of a kind, compare pair
+            if (loserFullHouse.pairValue !== winnerFullHouse.pairValue) {
+                const winnerPairName = getCardName({ value: winnerFullHouse.pairValue, suit: '♠' });
+                const loserPairName = getCardName({ value: loserFullHouse.pairValue, suit: '♠' });
+                return `${winnerPairName}s vs ${loserPairName}s as pair`;
+            }
+            
+            return 'a better full house';
+        }
+        
+        function getFourOfAKindKickerExplanation(loserCards, winnerCards) {
+            const loserCounts = getCardCounts(loserCards);
+            const winnerCounts = getCardCounts(winnerCards);
+            
+            const loserFourValue = Object.entries(loserCounts).find(([value, count]) => count === 4)[0];
+            const winnerFourValue = Object.entries(winnerCounts).find(([value, count]) => count === 4)[0];
+            
+            if (loserFourValue !== winnerFourValue) {
+                const winnerFourName = getCardName({ value: parseInt(winnerFourValue), suit: '♠' });
+                const loserFourName = getCardName({ value: parseInt(loserFourValue), suit: '♠' });
+                return `${winnerFourName}s vs ${loserFourName}s`;
+            }
+            
+            // Same four of a kind, compare kicker
+            const loserKicker = loserCards.find(card => card.value !== parseInt(loserFourValue));
+            const winnerKicker = winnerCards.find(card => card.value !== parseInt(winnerFourValue));
+            
+            if (loserKicker.value !== winnerKicker.value) {
+                const winnerKickerName = getCardName(winnerKicker);
+                const loserKickerName = getCardName(loserKicker);
+                return `${winnerKickerName} kicker vs ${loserKickerName} kicker`;
+            }
+            
+            return 'a better kicker';
+        }
+        
+        // Helper function to get ordinal suffix
+        function getOrdinalSuffix(num) {
+            if (num === 1) return 'st';
+            if (num === 2) return 'nd';
+            if (num === 3) return 'rd';
+            return 'th';
+        }
     </script>
 </body>
 </html>
